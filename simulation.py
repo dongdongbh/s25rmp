@@ -5,7 +5,6 @@ import numpy as np
 
 class ErgoJrEnv(object):
 
-    # override this for urdf logic, should return robot pybullet id
     def load_urdf(self):
         fpath = os.path.dirname(os.path.abspath(__file__))
         pb.setAdditionalSearchPath(fpath)
@@ -22,17 +21,12 @@ class ErgoJrEnv(object):
         timestep=1/240,
         control_period=1,
         show=True,
-        step_hook=None
     ):
-
-        # step_hook(env, action) is called in each env.step(action)
-        if step_hook is None: step_hook = lambda env, action: None
 
         self.control_mode = control_mode
         self.timestep = timestep
         self.control_period = control_period
         self.show = show
-        self.step_hook = step_hook
 
         self.client_id = pb.connect(pb.GUI if show else pb.DIRECT)
         if show: pb.configureDebugVisualizer(pb.COV_ENABLE_SHADOWS, 0)
@@ -41,9 +35,7 @@ class ErgoJrEnv(object):
         pb.setAdditionalSearchPath(getDataPath())
         pb.loadURDF("plane.urdf")
         
-        # use overridden loading logic
         self.robot_id = self.load_urdf()
-
         self.num_joints = pb.getNumJoints(self.robot_id)
         self.joint_name, self.joint_index, self.joint_fixed = {}, {}, {}
         for i in range(self.num_joints):
@@ -55,10 +47,10 @@ class ErgoJrEnv(object):
         
         self.initial_state_id = pb.saveState(self.client_id)
 
+        # reasonable initial viewpoint for arm
         pb.resetDebugVisualizerCamera(
             1.2000000476837158, 56.799964904785156, -22.20000648498535,
             (-0.6051651835441589, 0.26229506731033325, -0.24448847770690918))
-
 
     def reset(self):
         # pb.resetSimulation()
@@ -68,51 +60,21 @@ class ErgoJrEnv(object):
         pb.disconnect()
 
     def get_base(self):
-        pos, quat = pb.getBasePositionAndOrientation(self.robot_id)
-        return (pos, quat)
+        loc, quat = pb.getBasePositionAndOrientation(self.robot_id)
+        return (loc, quat)
 
-    def step_simple(self, action):
+    def step(self, action):
         pb.setJointMotorControlArray(
             self.robot_id,
             jointIndices = range(len(self.joint_index)),
             controlMode = self.control_mode,
             targetPositions = action,
             targetVelocities = [0]*len(action),
-            positionGains = [.25]*len(action), # important for constant position accuracy
+            positionGains = [.25]*len(action), # important for position accuracy
         )
         for _ in range(self.control_period):
             pb.stepSimulation()
-        
-    def step(self, action=None, sleep=None):
-        # this original step version doesn't seem to handle control periods properly
-        
-        self.step_hook(self, action)
-    
-        if action is not None:
-            duration = self.control_period * self.timestep
-            distance = np.fabs(action - self.get_position())
-            pb.setJointMotorControlArray(
-                self.robot_id,
-                jointIndices = range(len(self.joint_index)),
-                controlMode = self.control_mode,
-                targetPositions = action,
-                targetVelocities = [0]*len(action),
-                positionGains = [.25]*len(action), # important for constant position accuracy
-                # maxVelocities = distance / duration,
-            )
 
-        if sleep is None: sleep = self.show
-        if sleep:
-            for _ in range(self.control_period):
-                start = time.perf_counter()
-                pb.stepSimulation()
-                duration = time.perf_counter() - start
-                remainder = self.timestep - duration
-                if remainder > 0: time.sleep(remainder)
-        else:
-            for _ in range(self.control_period):
-                pb.stepSimulation()
-    
     # get/set joint angles as np.array
     def get_position(self):
         states = pb.getJointStates(self.robot_id, range(len(self.joint_index)))
@@ -185,26 +147,6 @@ class ErgoJrEnv(object):
             buffers.append(positions)
 
         return np.concatenate(buffers, axis=0)
-    
-    # Run IK, accounting for fixed joints
-    def inverse_kinematics(self, link_indices, target_positions, num_iters=1000):
-
-        angles = pb.calculateInverseKinematics2(
-            self.robot_id,
-            link_indices,
-            target_positions,
-            # residualThreshold=1e-4, # default 1e-4 not enough for ergo jr
-            maxNumIterations=num_iters, # default 20 usually not enough
-        )
-
-        a = 0
-        result = self.get_position()
-        for r in range(self.num_joints):
-            if not self.joint_fixed[r]:
-                result[r] = angles[a]
-                a += 1
-        
-        return result
 
     def get_tip_positions(self):
         states = pb.getLinkStates(self.robot_id, [5, 7])
@@ -228,24 +170,30 @@ class ErgoJrEnv(object):
         _, _, rgba, _, _ = pb.getCameraImage(
             width, height, view, proj,
             flags = pb.ER_NO_SEGMENTATION_MASK) # not much speed difference
+        rgba = np.array(rgba).reshape((height, width, 4))
         # rgba = np.empty((height, width, 4)) # much faster than pb.getCameraImage
         return rgba, view, proj
 
 if __name__ == '__main__':
 
+    import matplotlib.pyplot as pt
+
     env = ErgoJrEnv(pb.POSITION_CONTROL)
 
-    # from check/camera.py
-    pb.resetDebugVisualizerCamera(
-        1.2000000476837158, 56.799964904785156, -22.20000648498535,
-        (-0.6051651835441589, 0.26229506731033325, -0.24448847770690918))
+    target = 0.5*np.random.randn(env.num_joints)
+    env.goto_position(target, speed=0.1)
 
-    action = [0.]*env.num_joints
-    action[env.joint_index['m6']] = .5
-    while True:
-        env.step(action)
+    rgba, _, _ = env.get_camera_image()
+    print(rgba.shape)
+    pt.imshow(rgba)
+    pt.show()
 
+    # action = [0.]*env.num_joints
+    # action[env.joint_index['m6']] = .5
+    # while True:
+    #     env.step(action)
 
+    env.close()
 
 
 
