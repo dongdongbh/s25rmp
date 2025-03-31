@@ -4,6 +4,8 @@ from pybullet_data import getDataPath
 import itertools as it
 import numpy as np
 
+BASE_Z = 0.02
+
 class SimulationEnvironment(object):
 
     def _load_urdf(self):
@@ -12,7 +14,7 @@ class SimulationEnvironment(object):
         print(fpath)
         robot_id = pb.loadURDF(
             'poppy_ergo_jr.pybullet.urdf',
-            basePosition = (0, 0, 0),
+            basePosition = (0, 0, BASE_Z),
             baseOrientation = pb.getQuaternionFromEuler((0,0,0)),
             useFixedBase=True)
         return robot_id
@@ -39,18 +41,30 @@ class SimulationEnvironment(object):
         # setup robot        
         self.robot_id = self._load_urdf()
         self.num_joints = pb.getNumJoints(self.robot_id)
-        self.joint_name, self.joint_index, self.joint_fixed = {}, {}, {}
+        self.joint_name, self.joint_index, self.joint_fixed = [], {}, []
+        self.translation, self.orientation, self.axis = [], [], []
+        self.parent_index = []
         for i in range(self.num_joints):
             info = pb.getJointInfo(self.robot_id, i)
             name = info[1].decode('UTF-8')
-            self.joint_name[i] = name
+
+            self.joint_name.append(name)
             self.joint_index[name] = i
-            self.joint_fixed[i] = (info[2] == pb.JOINT_FIXED)
+            self.joint_fixed.append(info[2] == pb.JOINT_FIXED)
+
+            self.translation.append(info[-3])
+            self.orientation.append(info[-2])
+            self.axis.append(None if self.joint_fixed[i] else info[-4])
+            self.parent_index.append(info[-1])
 
         # setup block data
         self.block_colors = list(it.product([0,1], repeat=3))
         self.block_id = {}
 
+        # add a block for the arm platform (0 mass is static)
+        self._add_block((0, .065, -.105 + BASE_Z), (0,0,0,1), mass = 0, side=.2)
+
+        # save initial state for resets
         self.initial_state_id = pb.saveState(self.client_id)
 
         # reasonable initial viewpoint for arm
@@ -67,6 +81,18 @@ class SimulationEnvironment(object):
         Call when simulation is complete to avoid memory leaks
         """
         pb.disconnect()
+
+    def get_joint_info(self):
+        """
+        Return joint_info, a tuple of joint information
+        joint_info[i] = (joint_name, parent_index, translation, orientation, axis) for ith joint
+        joint_name: string identifier for joint
+        parent_index: index in joint_info of parent (-1 is base)
+        translation: (3,) translation vector in parent joint's local frame
+        orientation: (4,) orientation quaternion in parent joint's local frame
+        axis: (3,) rotation axis vector in ith joint's own local frame (None for fixed joints)
+        """
+        return tuple(zip(self.joint_name, self.parent_index, self.translation, self.orientation, self.axis))
 
     def _add_block(self, pos, quat, mass=2, side=.02):
 
@@ -131,7 +157,8 @@ class SimulationEnvironment(object):
     def _angle_dict_from(self, angle_array, convert=True):
         return {
             name: angle_array[j] * (180/np.pi if convert else 1)
-            for j, name in enumerate(self.joint_index)}
+            for j, name in enumerate(self.joint_name)
+            if not self.joint_fixed[j]}
 
     def get_current_angles(self):
         """
@@ -176,17 +203,17 @@ class SimulationEnvironment(object):
         """
         Returns current RGBA image array of shape (height, width, 4)
         """
-        width, height = 128, 128
+        width, height = 128, 96
         view = pb.computeViewMatrix(
-            cameraEyePosition=(0,-.02,.02),
-            cameraTargetPosition=(0,-.4,.02), # focal point
+            cameraEyePosition=(0, -.025, BASE_Z + .02),
+            cameraTargetPosition=(0, -.4, 0), # focal point
             cameraUpVector=(0,0,.5),
         )
         proj = pb.computeProjectionMatrixFOV(
             fov=135,
             aspect=height/width,
-            nearVal=0.01,
-            farVal=.4,
+            nearVal=.005,
+            farVal=1.,
         )
         # rgba shape is (height, width, 4)
         _, _, rgba, _, _ = pb.getCameraImage(
@@ -202,7 +229,11 @@ if __name__ == '__main__':
 
     env = SimulationEnvironment()
 
+    joint_info = env.get_joint_info()
     current = env.get_current_angles()
+    for info in joint_info: print(info)
+    print(current)
+
     target = {motor: 20*np.random.randn() for motor in current.keys()}
     env.goto_position(target, duration=10.)
 

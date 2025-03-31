@@ -1,5 +1,6 @@
 import itertools as it
 import numpy as np
+import matplotlib.pyplot as pt
 import pybullet as pb
 from simulation import SimulationEnvironment
 from submission import Controller
@@ -93,6 +94,11 @@ if __name__ == "__main__":
 
     # sample a validation trial
     env, goal_poses = sample_trial(num_blocks=5, num_swaps=1)
+
+    # check camera image
+    rgba, _, _ = env.get_camera_image()
+    pt.imshow(rgba)
+    pt.show()
 
     # run the controller on the trial
     controller.run(env, goal_poses)
