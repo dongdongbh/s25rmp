@@ -1,9 +1,10 @@
 import os, time
 import pybullet as pb
 from pybullet_data import getDataPath
+import itertools as it
 import numpy as np
 
-class ErgoJrEnv(object):
+class SimulationEnvironment(object):
 
     def load_urdf(self):
         fpath = os.path.dirname(os.path.abspath(__file__))
@@ -17,24 +18,25 @@ class ErgoJrEnv(object):
         return robot_id
 
     def __init__(self,
-        control_mode=pb.POSITION_CONTROL,
         timestep=1/240,
-        control_period=1,
         show=True,
     ):
 
-        self.control_mode = control_mode
         self.timestep = timestep
-        self.control_period = control_period
         self.show = show
 
+        self.control_mode = pb.POSITION_CONTROL
+        self.control_period = 1
+
+        # setup world
         self.client_id = pb.connect(pb.GUI if show else pb.DIRECT)
         if show: pb.configureDebugVisualizer(pb.COV_ENABLE_SHADOWS, 0)
         pb.setTimeStep(timestep)
         pb.setGravity(0, 0, -9.81)
         pb.setAdditionalSearchPath(getDataPath())
         pb.loadURDF("plane.urdf")
-        
+
+        # setup robot        
         self.robot_id = self.load_urdf()
         self.num_joints = pb.getNumJoints(self.robot_id)
         self.joint_name, self.joint_index, self.joint_fixed = {}, {}, {}
@@ -44,7 +46,11 @@ class ErgoJrEnv(object):
             self.joint_name[i] = name
             self.joint_index[name] = i
             self.joint_fixed[i] = (info[2] == pb.JOINT_FIXED)
-        
+
+        # setup block data
+        self.block_colors = list(it.product([0,1], repeat=3))
+        self.block_id = {}
+
         self.initial_state_id = pb.saveState(self.client_id)
 
         # reasonable initial viewpoint for arm
@@ -59,8 +65,32 @@ class ErgoJrEnv(object):
     def close(self):
         pb.disconnect()
 
+    def add_block(self, pos, quat, mass=2, side=.02):
+
+        # setup new label
+        b = len(self.block_id)
+        block = f"b{b:01d}"
+
+        # setup pybullet multibody
+        half_exts = (side*.5,)*3
+        rgba = self.block_colors[b % len(self.block_colors)] + (1,)
+        cube_collision = pb.createCollisionShape(pb.GEOM_BOX, halfExtents=half_exts)
+        cube_visual = pb.createVisualShape(pb.GEOM_BOX, halfExtents=half_exts, rgbaColor=rgba)
+
+        # add to environment
+        self.block_id[block] = pb.createMultiBody(
+            mass, cube_collision, cube_visual,
+            basePosition=pos, baseOrientation=quat)
+
+        # return new block label
+        return block
+
     def get_base(self):
         loc, quat = pb.getBasePositionAndOrientation(self.robot_id)
+        return (loc, quat)
+
+    def get_block_pose(self, label):
+        loc, quat = pb.getBasePositionAndOrientation(self.block_id[label])
         return (loc, quat)
 
     def step(self, action):
@@ -119,34 +149,10 @@ class ErgoJrEnv(object):
 
         return positions
 
-    # poppy_wrapper-style trajectory tracker
-    def track_trajectory(self, trajectory, binsize=None, overshoot=None, ms_rpms = 0.165, hang=False):
-        # trajectory = [..., (duration (sec), waypoint) ...]
-        # waypoint[name] = angle (deg)
-        # returns buffers[t,a] = angle a at timestep t in radians
-        
-        # pybul doesn't have fast array-version maxvel and pos ctrl is unrealistically fast
-        # linearly interpolate waypoints to throttle speed
-
-        buffers = []        
-        for (duration, waypoint) in trajectory:
-            current = self.get_position()
-            target = self.angle_array(waypoint)
-
-            num_steps = int(duration / (self.timestep * self.control_period) + 1)
-            weights = np.linspace(0, 1, num_steps).reshape(-1,1)
-            interp = weights * target + (1 - weights) * current
-
-            positions = np.empty((num_steps, self.num_joints))
-            for a, action in enumerate(interp):
-                # self.step(action) # doesn't handle different control periods properly
-                self.step_simple(action)
-                positions[a] = self.get_position()
-                if hang: input('..')
-
-            buffers.append(positions)
-
-        return np.concatenate(buffers, axis=0)
+    def settle(self, seconds=1.):
+        action = self.get_position()
+        num_steps = int(seconds / self.timestep)
+        for _ in range(num_steps): self.step(action)
 
     def get_tip_positions(self):
         states = pb.getLinkStates(self.robot_id, [5, 7])
@@ -178,20 +184,15 @@ if __name__ == '__main__':
 
     import matplotlib.pyplot as pt
 
-    env = ErgoJrEnv(pb.POSITION_CONTROL)
+    env = SimulationEnvironment()
 
     target = 0.5*np.random.randn(env.num_joints)
-    env.goto_position(target, speed=0.1)
+    env.goto_position(target, speed=0.01)
 
     rgba, _, _ = env.get_camera_image()
     print(rgba.shape)
     pt.imshow(rgba)
     pt.show()
-
-    # action = [0.]*env.num_joints
-    # action[env.joint_index['m6']] = .5
-    # while True:
-    #     env.step(action)
 
     env.close()
 
