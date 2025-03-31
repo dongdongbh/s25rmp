@@ -6,7 +6,7 @@ import numpy as np
 
 class SimulationEnvironment(object):
 
-    def load_urdf(self):
+    def _load_urdf(self):
         fpath = os.path.dirname(os.path.abspath(__file__))
         pb.setAdditionalSearchPath(fpath)
         print(fpath)
@@ -17,27 +17,27 @@ class SimulationEnvironment(object):
             useFixedBase=True)
         return robot_id
 
-    def __init__(self,
-        timestep=1/240,
-        show=True,
-    ):
+    def __init__(self, show=True):
+        """
+        Initializes simulation environment with given parameters
+        show: if True, visualize the simulation, otherwise run in background (faster)
+        """
 
-        self.timestep = timestep
         self.show = show
-
+        self.timestep = 1/240
         self.control_mode = pb.POSITION_CONTROL
         self.control_period = 1
 
         # setup world
         self.client_id = pb.connect(pb.GUI if show else pb.DIRECT)
         if show: pb.configureDebugVisualizer(pb.COV_ENABLE_SHADOWS, 0)
-        pb.setTimeStep(timestep)
+        pb.setTimeStep(self.timestep)
         pb.setGravity(0, 0, -9.81)
         pb.setAdditionalSearchPath(getDataPath())
         pb.loadURDF("plane.urdf")
 
         # setup robot        
-        self.robot_id = self.load_urdf()
+        self.robot_id = self._load_urdf()
         self.num_joints = pb.getNumJoints(self.robot_id)
         self.joint_name, self.joint_index, self.joint_fixed = {}, {}, {}
         for i in range(self.num_joints):
@@ -58,14 +58,17 @@ class SimulationEnvironment(object):
             1.2000000476837158, 56.799964904785156, -22.20000648498535,
             (-0.6051651835441589, 0.26229506731033325, -0.24448847770690918))
 
-    def reset(self):
+    def _reset(self):
         # pb.resetSimulation()
         pb.restoreState(stateId = self.initial_state_id)
     
     def close(self):
+        """
+        Call when simulation is complete to avoid memory leaks
+        """
         pb.disconnect()
 
-    def add_block(self, pos, quat, mass=2, side=.02):
+    def _add_block(self, pos, quat, mass=2, side=.02):
 
         # setup new label
         b = len(self.block_id)
@@ -85,15 +88,20 @@ class SimulationEnvironment(object):
         # return new block label
         return block
 
-    def get_base(self):
+    def _get_base(self):
         loc, quat = pb.getBasePositionAndOrientation(self.robot_id)
         return (loc, quat)
 
     def get_block_pose(self, label):
+        """
+        returns pose = (loc, quat) of block with given label
+        loc: (x,y,z) coordinates of block
+        quat: (x,y,z,w) where (x,y,z) is the axis of rotation and w is the "real" part
+        """        
         loc, quat = pb.getBasePositionAndOrientation(self.block_id[label])
         return (loc, quat)
 
-    def step(self, action):
+    def _step(self, action):
         pb.setJointMotorControlArray(
             self.robot_id,
             jointIndices = range(len(self.joint_index)),
@@ -106,61 +114,69 @@ class SimulationEnvironment(object):
             pb.stepSimulation()
 
     # get/set joint angles as np.array
-    def get_position(self):
+    def _get_position(self):
         states = pb.getJointStates(self.robot_id, range(len(self.joint_index)))
         return np.array([state[0] for state in states])    
-    def set_position(self, position):
-        for p, angle in enumerate(position):
-            pb.resetJointState(self.robot_id, p, angle)
 
     # convert a pypot style dictionary {... name:angle ...} to joint angle array
     # if convert == True, convert from degrees to radians
-    def angle_array(self, angle_dict, convert=True):
+    def _angle_array_from(self, angle_dict, convert=True):
         angle_array = np.zeros(self.num_joints)
         for name, angle in angle_dict.items():
             angle_array[self.joint_index[name]] = angle
         if convert: angle_array *= np.pi / 180
         return angle_array
+
     # convert back to dict from array
-    def angle_dict(self, angle_array, convert=True):
+    def _angle_dict_from(self, angle_array, convert=True):
         return {
             name: angle_array[j] * (180/np.pi if convert else 1)
             for j, name in enumerate(self.joint_index)}
 
-    # pypot-style command, goes to position in given duration
-    # target is a joint angle array
-    # speed is desired joint speed
-    # if hang==True, wait for user enter at each timestep of motion
-    def goto_position(self, target, speed=1., hang=False):
+    def get_current_angles(self):
+        """
+        Get PyPot-style dictionary of current angles
+        Returns angle_dict where angle_dict[joint_name] == angle (in degrees)
+        """
+        return self._angle_dict_from(self._get_position())
 
-        current = self.get_position()
-        distance = np.sum((target - current)**2)**.5
-        duration = distance / speed
+    def goto_position(self, target, duration=1.):
+        """
+        PyPot-style method that commands the arm to given target joint angles
+        target is a dictionary where target[joint_name] == angle (in degrees)
+        duration: time in seconds for the motion to complete
+        """
 
+        # get current/target angle arrays
+        current = self._get_position()
+        target = self._angle_array_from(target)
+
+        # linearly interpolate trajectory
         num_steps = int(duration / (self.timestep * self.control_period) + 1)
         weights = np.linspace(0, 1, num_steps).reshape(-1,1)
         trajectory = weights * target + (1 - weights) * current
 
-        positions = np.empty((num_steps, self.num_joints))
-        for a, action in enumerate(trajectory):
-            self.step(action)
-            positions[a] = self.get_position()
-            if hang: input('..')
-
-        return positions
+        # run trajectory
+        for a, action in enumerate(trajectory): self._step(action)
 
     def settle(self, seconds=1.):
-        action = self.get_position()
+        """
+        Runs simulation for given number of seconds to let blocks settle
+        Arm is kept fixed at current position
+        """
+        action = self._get_position()
         num_steps = int(seconds / self.timestep)
-        for _ in range(num_steps): self.step(action)
+        for _ in range(num_steps): self._step(action)
 
-    def get_tip_positions(self):
-        states = pb.getLinkStates(self.robot_id, [5, 7])
-        return (states[0][0], states[1][0])
+    # def get_tip_positions(self):
+    #     states = pb.getLinkStates(self.robot_id, [5, 7])
+    #     return (states[0][0], states[1][0])
     
     def get_camera_image(self):
+        """
+        Returns current RGBA image array of shape (height, width, 4)
+        """
         width, height = 128, 128
-        # width, height = 8, 8 # doesn't actually make much difference
         view = pb.computeViewMatrix(
             cameraEyePosition=(0,-.02,.02),
             cameraTargetPosition=(0,-.4,.02), # focal point
@@ -186,8 +202,9 @@ if __name__ == '__main__':
 
     env = SimulationEnvironment()
 
-    target = 0.5*np.random.randn(env.num_joints)
-    env.goto_position(target, speed=0.01)
+    current = env.get_current_angles()
+    target = {motor: 20*np.random.randn() for motor in current.keys()}
+    env.goto_position(target, duration=10.)
 
     rgba, _, _ = env.get_camera_image()
     print(rgba.shape)
