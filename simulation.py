@@ -94,7 +94,15 @@ class SimulationEnvironment(object):
         """
         return tuple(zip(self.joint_name, self.parent_index, self.translation, self.orientation, self.axis))
 
-    def _add_block(self, pos, quat, mass=2, side=.02):
+    def _add_block(self, loc, quat, mass=2, side=.02):
+        """
+        Add a new block to the environment with given parameters
+        loc: (3,) location vector in world frame
+        quat: (4,) orientation quaternion in world frame
+        mass: the mass of the block (0 is fixed in place)
+        side: the length of each side (block is a cube)
+        returns a string label for the block
+        """
 
         # setup new label
         b = len(self.block_id)
@@ -109,7 +117,7 @@ class SimulationEnvironment(object):
         # add to environment
         self.block_id[block] = pb.createMultiBody(
             mass, cube_collision, cube_visual,
-            basePosition=pos, baseOrientation=quat)
+            basePosition=loc, baseOrientation=quat)
 
         # return new block label
         return block

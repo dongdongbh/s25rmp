@@ -1,4 +1,7 @@
-# replace with your implementation
+"""
+See sample.py for examples
+Implement Controller class with your motion planner
+"""
 
 class Controller:
     def __init__(self):
@@ -11,5 +14,6 @@ class Controller:
 
 if __name__ == "__main__":
 
+    # you can edit this part for informal testing
     pass
 

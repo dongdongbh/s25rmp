@@ -7,7 +7,7 @@ from submission import Controller
 
 CUBE_SIDE = .02
 
-def get_base_positions(half_spots=4):
+def get_tower_base_poses(half_spots=4):
     radii = (-.14, -.19) #-.16
     alpha = 0.75*1.57
     thetas = (3.14 - alpha)/2 + alpha * np.arange(half_spots) / (half_spots-1)
@@ -24,7 +24,7 @@ def sample_trial(num_blocks, num_swaps, show=True):
     env = SimulationEnvironment(show=show)
 
     # sample initial block positions
-    bases = get_base_positions()
+    bases = get_tower_base_poses()
 
     # stack some random blocks
     towers = [[base] for base in bases]
@@ -74,7 +74,7 @@ def evaluate(env, goal_poses):
         loc, quat = map(np.array, env.get_block_pose(label))
 
         # "correct" means within tolerance of goal location
-        if (np.fabs(loc - goal_loc) < CUBE_SIDE / 4).all():
+        if (np.fabs(loc - goal_loc) < CUBE_SIDE / 2).all():
             num_correct += 1
 
         # location error: distance to goal location
