@@ -63,6 +63,7 @@ if __name__ == "__main__":
     controller = ExampleController()
 
     # launch environment, show=True visualizes the simulation
+    # show=False is substantially faster for when you are training/testing
     env = SimulationEnvironment(show=True)
 
     # joint info is available for you to program forward/inverse kinematics
@@ -129,3 +130,4 @@ if __name__ == "__main__":
     print(f"\n{int(100*accuracy)}% of blocks near correct goal positions")
     print(f"mean|max location error = {np.mean(loc_errors):.3f}|{np.max(loc_errors):.3f}")
     print(f"mean|max rotation error = {np.mean(rot_errors):.3f}|{np.max(rot_errors):.3f}")
+

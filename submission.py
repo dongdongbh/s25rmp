@@ -1,5 +1,5 @@
 """
-See sample.py for examples
+See example.py for examples
 Implement Controller class with your motion planner
 """
 

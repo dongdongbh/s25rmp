@@ -210,6 +210,8 @@ class SimulationEnvironment(object):
     def get_camera_image(self):
         """
         Returns current RGBA image array of shape (height, width, 4)
+        also returns PyBullet camera view and projection matrices
+        Note that PyBullet image capture is fairly time-consuming
         """
         width, height = 128, 96
         view = pb.computeViewMatrix(
@@ -228,7 +230,6 @@ class SimulationEnvironment(object):
             width, height, view, proj,
             flags = pb.ER_NO_SEGMENTATION_MASK) # not much speed difference
         rgba = np.array(rgba).reshape((height, width, 4))
-        # rgba = np.empty((height, width, 4)) # much faster than pb.getCameraImage
         return rgba, view, proj
 
 if __name__ == '__main__':

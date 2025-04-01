@@ -8,7 +8,7 @@ from submission import Controller
 CUBE_SIDE = .02
 
 def get_tower_base_poses(half_spots=4):
-    radii = (-.14, -.19) #-.16
+    radii = (-.14, -.19)
     alpha = 0.75*1.57
     thetas = (3.14 - alpha)/2 + alpha * np.arange(half_spots) / (half_spots-1)
 
