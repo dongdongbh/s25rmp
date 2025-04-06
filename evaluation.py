@@ -2,7 +2,7 @@ import itertools as it
 import numpy as np
 import matplotlib.pyplot as pt
 import pybullet as pb
-from simulation import SimulationEnvironment
+from simulation import SimulationEnvironment, _pb_to_quat
 from submission import Controller
 
 CUBE_SIDE = .02
@@ -15,7 +15,7 @@ def get_tower_base_poses(half_spots=4):
     bases = ()
     for (r, theta) in it.product(radii, thetas):
         pos = (r*np.cos(theta), r*np.sin(theta), -0.5*CUBE_SIDE)
-        quat = pb.getQuaternionFromEuler((0,0,theta))
+        quat = _pb_to_quat(pb.getQuaternionFromEuler((0,0,theta)))
         bases += ((pos, quat),)
 
     return bases
@@ -81,7 +81,7 @@ def evaluate(env, goal_poses):
         loc_errors.append(np.linalg.norm(loc - goal_loc))
 
         # rotation error: angle of rotation to align orientations
-        rot_errors.append(2*np.arccos(min(1., np.fabs(quat @ goal_quat))))      
+        rot_errors.append(2*np.arccos(min(1., np.fabs(quat @ goal_quat))))
 
     accuracy = num_correct / len(goal_poses)
 

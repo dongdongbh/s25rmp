@@ -6,6 +6,11 @@ import numpy as np
 
 BASE_Z = 0.02
 
+# helpers to convert between versor conventions
+# pybullet is (x,y,z,w), ours is (w,x,y,z)
+def _quat_to_pb(quat): return quat[1:] + (quat[0],)
+def _pb_to_quat(quat): return (quat[3],) + quat[:3]
+
 class SimulationEnvironment(object):
 
     def _load_urdf(self):
@@ -42,8 +47,6 @@ class SimulationEnvironment(object):
         self.robot_id = self._load_urdf()
         self.num_joints = pb.getNumJoints(self.robot_id)
         self.joint_name, self.joint_index, self.joint_fixed = [], {}, []
-        self.translation, self.orientation, self.axis = [], [], []
-        self.parent_index = []
         for i in range(self.num_joints):
             info = pb.getJointInfo(self.robot_id, i)
             name = info[1].decode('UTF-8')
@@ -51,11 +54,6 @@ class SimulationEnvironment(object):
             self.joint_name.append(name)
             self.joint_index[name] = i
             self.joint_fixed.append(info[2] == pb.JOINT_FIXED)
-
-            self.translation.append(info[-3])
-            self.orientation.append(info[-2])
-            self.axis.append(None if self.joint_fixed[i] else info[-4])
-            self.parent_index.append(info[-1])
 
         # setup block data
         self.block_colors = list(it.product([0,1], repeat=3))
@@ -92,7 +90,16 @@ class SimulationEnvironment(object):
         orientation: (4,) orientation quaternion in parent joint's local frame
         axis: (3,) rotation axis vector in ith joint's own local frame (None for fixed joints)
         """
-        return tuple(zip(self.joint_name, self.parent_index, self.translation, self.orientation, self.axis))
+        return (
+            ('m1', -1, (0.0, 0.0, 0.0327993216120967), (1.0, 0.0, 0.0, 0.0), (0.0, 0.0, 1.0)),
+            ('m2', 0, (0.0, 0.0, 0.0240006783879033), (0.7071067811865462, 0.0, -0.7071067811865488, 0.0), (0.0, 0.0, -1.0)),
+            ('m3', 1, (0.054, 0.0, 0.0), (1.0, 0.0, 0.0, 0.0), (0.0, 0.0, -1.0)),
+            ('m4', 2, (0.045, 0.0, 0.0), (-0.7071067811865462, 0.0, 0.7071067811865488, 0.0), (0.0, 0.0, -1.0)),
+            ('m5', 3, (0.0, -0.048, 0.0), (0.7071067811865462, 0.0, -0.7071067811865488, 0.0), (0.0, 0.0, 1.0)),
+            ('t7f', 4, (0.0, -0.125, 0.0155), (1.0, 0.0, 0.0, 0.0), None), # fixed finger tip
+            ('m6', 4, (0.0, -0.058, 0.0), (0.7071067811865462, 0.0, -0.7071067811865488, 0.0), (0.0, 0.0, -1.0)), # gripper motor
+            ('t7m', 6, (-0.0155, -0.0675, 0.0), (1.0, 0.0, 0.0, 0.0), None), # movable finger tip
+        )
 
     def _add_block(self, loc, quat, mass=2, side=.02):
         """
@@ -117,23 +124,23 @@ class SimulationEnvironment(object):
         # add to environment
         self.block_id[block] = pb.createMultiBody(
             mass, cube_collision, cube_visual,
-            basePosition=loc, baseOrientation=quat)
+            basePosition=loc, baseOrientation=_quat_to_pb(quat))
 
         # return new block label
         return block
 
     def _get_base(self):
         loc, quat = pb.getBasePositionAndOrientation(self.robot_id)
-        return (loc, quat)
+        return (loc, _pb_to_quat(quat))
 
     def get_block_pose(self, label):
         """
         returns pose = (loc, quat) of block with given label
         loc: (x,y,z) coordinates of block
-        quat: (x,y,z,w) where (x,y,z) is the axis of rotation and w is the "real" part
+        quat: (w,x,y,z) where (x,y,z) is the axis of rotation and w is the "real" part
         """        
         loc, quat = pb.getBasePositionAndOrientation(self.block_id[label])
-        return (loc, quat)
+        return (loc, _pb_to_quat(quat))
 
     def _step(self, action):
         pb.setJointMotorControlArray(
@@ -202,10 +209,6 @@ class SimulationEnvironment(object):
         action = self._get_position()
         num_steps = int(seconds / self.timestep)
         for _ in range(num_steps): self._step(action)
-
-    # def get_tip_positions(self):
-    #     states = pb.getLinkStates(self.robot_id, [5, 7])
-    #     return (states[0][0], states[1][0])
     
     def get_camera_image(self):
         """
