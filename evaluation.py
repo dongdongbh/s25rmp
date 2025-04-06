@@ -5,11 +5,11 @@ import pybullet as pb
 from simulation import SimulationEnvironment, _pb_to_quat
 from submission import Controller
 
-CUBE_SIDE = .02
+CUBE_SIDE = 0.01905 # .75 inches
 
 def get_tower_base_poses(half_spots=4):
     radii = (-.14, -.19)
-    alpha = 0.75*1.57
+    alpha = 0.5*1.57
     thetas = (3.14 - alpha)/2 + alpha * np.arange(half_spots) / (half_spots-1)
 
     bases = ()
@@ -93,7 +93,7 @@ if __name__ == "__main__":
     controller = Controller()
 
     # sample a validation trial
-    env, goal_poses = sample_trial(num_blocks=5, num_swaps=1)
+    env, goal_poses = sample_trial(num_blocks=20, num_swaps=1)
 
     # check camera image
     rgba, _, _ = env.get_camera_image()

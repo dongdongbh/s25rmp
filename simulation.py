@@ -4,7 +4,7 @@ from pybullet_data import getDataPath
 import itertools as it
 import numpy as np
 
-BASE_Z = 0.02
+BASE_Z = 0.05715 # 2.25 inches
 
 # helpers to convert between versor conventions
 # pybullet is (x,y,z,w), ours is (w,x,y,z)
@@ -60,7 +60,7 @@ class SimulationEnvironment(object):
         self.block_id = {}
 
         # add a block for the arm platform (0 mass is static)
-        self._add_block((0, .065, -.105 + BASE_Z), (0,0,0,1), mass = 0, side=.2)
+        self._add_block((0, .0682, -.1066 + BASE_Z), (0,0,0,1), mass = 0, side=0.2032)
 
         # save initial state for resets
         self.initial_state_id = pb.saveState(self.client_id)
