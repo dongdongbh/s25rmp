@@ -3,5 +3,6 @@ scipy
 pybullet
 python-fcl
 trimesh
+pytest
 # Optional:
 ompl-bindings

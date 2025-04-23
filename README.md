@@ -1,27 +1,34 @@
-# s25rmp: Robotic Motion Planning for Poppy Ergo Jr
+# s25rmp: Poppy Ergo Jr Motion Planning
 
-This repository contains code and configuration for developing a Task & Motion Planner (TAMP) for the Poppy Ergo Jr robotic arm using PyBullet, PDDLStream, and optional OMPL motion planning.
+**This repository implements a full Task‐and‐Motion Planning (TAMP) pipeline** for the Poppy Ergo Jr platform.  We combine:
+
+- **Symbolic Task Planning** with PDDLStream
+- **Inverse Kinematics & Collision Checking** (HW2 code + FCL or PyBullet)
+- **Motion Planning** (linear interpolation + OMPL RRT‑Connect fallback)
 
 ---
-## 📁 Repository Structure
+## 📂 Project Structure
 
 ```
-├── evaluation.py             # Scripts for benchmarking and metrics
-├── example.py                # Minimal example usage
-├── LICENSE
-├── pddl/                     # PDDL domain & problem definitions
-│   ├── domain.pddl           # Symbolic actions: pick/place/move
-│   └── problem.pddl          # Initial & goal state for stacking blocks
-├── planners/                 # Planner interface code
-│   ├── ompl_motion.py        # RRT-Connect wrapper using OMPL
-│   └── pddlstream_interface.py # Stream samplers for IK, motion, collision
-├── poppy_ergo_jr.pybullet.urdf # Robot URDF description
-├── README.md                 # Project overview & setup instructions
-├── requirements.txt          # Python dependencies
-├── run_planner.py            # Entry point: PDDLStream planning & execution
-├── simulation.py             # Standalone PyBullet simulation & visualization
-├── submission.py             # (Template) final submission script
+├── pddl/                         # PDDL domain & problem definitions
+│   ├── domain.pddl               # :action pick/place/move
+│   └── problem.pddl              # initial & goal block states
+├── planners/                     # Planning‐interface modules
+│   ├── pddlstream_interface.py   # ik_stream, cfree_config, traj_free, STREAMS & ACTIONS
+│   └── ompl_motion.py            # plan_rrt_connect() wrapper for OMPL RRT‑Connect
+├── simulation.py                 # SimulationEnvironment API (PyBullet)
+├── run_planner.py                # plan_task() wrapper for PDDLStream
+├── submission.py                 # Controller.run() — integrate planner → env
+├── evaluation.py                 # End‐to‐end evaluation of Controller (accuracy metrics)
+├── example.py                    # Minimal example of Controller usage
+├── tests/                        # Unit tests for each module
+│   ├── test_streams.py
+│   └── test_motion.py
+├── requirements.txt              # pip dependencies
+├── README.md                     # This file
+└── LICENSE
 ```
+
 
 ---
 ## 🚀 Quickstart: Environment Setup
@@ -45,8 +52,10 @@ This repository contains code and configuration for developing a Task & Motion P
    pip install -r requirements.txt
    ```
 
-4. **Build & Install PDDLStream** (if using PDDLStream)
+4. **Build & Install PDDLStream** 
+    
    ```bash
+   cd ..
    git clone --recursive --branch main git@github.com:caelan/pddlstream.git
    cd pddlstream
    ./downward/build.py
@@ -88,90 +97,164 @@ python simulation.py
 python run_planner.py
 ```
 ---
-## 🗂️ Project Outline & Task Division
-
-We have three main modules, each owned by one team member:
-
-1️⃣ **Symbolic Task Planner (PDDLStream)**
-- **Owner:** Teammate A
-- **Responsibilities:**
-  - Write `pddl/domain.pddl` (types, predicates, pick/place/move actions).
-  - Write `pddl/problem.pddl` (initial state, goal arrangement).
-  - Configure `planners/pddlstream_interface.py` to map symbolic preconditions to streams (e.g., `ik-solved`, `motion-solved`, `traj-free`).
-  - Invoke PDDLStream’s `solve` in `run_planner.py` and parse the resulting sequence of actions + stream bindings.
-
-2️⃣ **IK & Collision Module**
-- **Owner:** Teammate B
-- **Responsibilities:**
-  - Use HW2 FK/IK code to implement `ik_stream(block, grasp) -> config` in Python.
-  - Implement collision checking (`cfree_config(q)`) and carried-block collision along a trajectory (`traj_free(path)`) using python-fcl or a DIRECT-mode PyBullet client.
-  - Expose these as PDDLStream streams so the planner can lazily verify feasibility.
-
-3️⃣ **Motion Planning Module**
-- **Owner:** Teammate C
-- **Responsibilities:**
-  - Wrap existing `goto_position` (linear interpolation) as `motion_stream(q1, q2)` for free-space motions.
-  - Integrate OMPL RRT-Connect fallback by implementing `plan_rrt_connect(q1, q2)` in `planners/ompl_motion.py`.
-  - In `motion_stream`, first attempt interpolation; if that fails collision checks, call RRT-Connect to generate a collision-free path.
-
-This three-way split ensures clear ownership:
-- **A** crafts the high-level plan,
-- **B** guarantees each configuration and trajectory is collision-free,
-- **C** provides fast and reliable motion paths (interpolation + sampling-based fallback).
 
 ---
-## 🔌 Module Interfaces & Testing
+## 📂 Project Structure & Responsibilities
 
-To ensure smooth integration, each module exposes clear APIs and test procedures.
+We split the system into three clear modules—each with defined files, APIs, and tests—so teammates can work in parallel:
+
+| Module                          | Owner       | Key Files                          | Public API                                | Unit Tests                              |
+|---------------------------------|-------------|------------------------------------|-------------------------------------------|------------------------------------------|
+| **Symbolic Task Planner**       | Teammate A  | `pddl/domain.pddl`, `pddl/problem.pddl`, `run_planner.py`  | `plan_task(domain, problem, STREAMS, ACTIONS) -> List[(action, params)]` | `tests/test_task_planner.py`            |
+| **IK & Collision**              | Teammate B  | `planners/pddlstream_interface.py`, `simulation.py` | `ik_stream(block, pose) -> Iterator[(config,)]`  <br> `cfree_config(config) -> bool`  <br> `traj_free(path, block) -> Iterator[()]` | `tests/test_streams.py`                  |
+| **Motion Planning**             | Teammate C  | `planners/ompl_motion.py`<br>`planners/pddlstream_interface.py` | `motion_stream(q1, q2) -> Iterator[(path,)]`  <br> `plan_rrt_connect(q1, q2) -> Optional[path]` | `tests/test_motion.py`                  |
+
+---
+## 🔌 Module Interfaces & Implementation Details
 
 ### 1️⃣ Symbolic Task Planner
-**Files to modify/add:**
-- `pddl/domain.pddl` (actions, predicates)
-- `pddl/problem.pddl` (initial/goal)
-- `run_planner.py` (calls PDDLStream)
+**Files:** `pddl/domain.pddl`, `pddl/problem.pddl`, `run_planner.py`
 
-**Interfaces & APIs:**
-- **Function:** `solve(domain_pddl, problem_pddl, streams, actions, planner, algorithm)`
-  - **Input:** paths to PDDL files, stream definitions from `planners/pddlstream_interface.py`, list of action schemas, planner settings
-  - **Output:** `plan`: list of `(action_name, parameters_dict)` plus bound stream outputs
+```python
+# run_planner.py
+from pddlstream.algorithms.meta import solve
+from pddlstream.language.stream import StreamInfo
+from pddlstream.language.function import FunctionInfo
+from typing import Dict, List, Tuple
 
-**Testing:**
-- **Unit test:** In `evaluation.py`, write a test that loads a trivial block-world (1 block) and asserts `solve(...)` returns the expected `pick`+`place` sequence.
-- **Manual test:** Run `python run_planner.py` with `pddl/problem.pddl` configured for a 2-block stack and verify console output of the action plan.
+def plan_task(
+    domain_pddl: str,
+    problem_pddl: str,
+    streams: Dict[str, StreamInfo],
+    actions: List[FunctionInfo],
+    planner: str = 'ff-astar',
+    algorithm: str = 'adaptive'
+) -> List[Tuple[str, Dict]]:
+    """Return [ (action_name, {param: value}), ... ]."""
+    return solve(
+        domain_pddl=domain_pddl,
+        problem_pddl=problem_pddl,
+        streams=streams,
+        actions=actions,
+        planner=planner,
+        algorithm=algorithm,
+    )
+```
 
-### 2️⃣ IK & Collision Module
-**Files to modify/add:**
-- `planners/pddlstream_interface.py` (implement `ik_stream`, `cfree_config`, `traj_free`)
-- *(Optional)* `simulation.py` or a new `collision.py` for standalone FCL-based collision routines
-
-**Interfaces & APIs:**
-- **`ik_stream(block_id, grasp_pose) -> yields (config_tuple,)`**
-- **`cfree_config(config_tuple) -> bool`**
-- **`traj_free(path_list, block_id) -> yields () if free`**
-
-**Testing:**
-- **Unit tests** in `evaluation.py`:
-  - Call `ik_stream` for a known pose and validate joint angles satisfy FK within tolerance.
-  - Call `cfree_config` on both collision-free and known-colliding configurations.
-  - Call `traj_free` on a manually constructed short path and assert expected outcome.
-- **Simulation test:** In `example.py`, script that teleports the robot to an IK solution and checks for collisions in direct-mode PyBullet.
-
-### 3️⃣ Motion Planning Module
-**Files to modify/add:**
-- `planners/ompl_motion.py` (implement `plan_rrt_connect`)
-- `planners/pddlstream_interface.py` (enhance `motion_stream` logic)
-
-**Interfaces & APIs:**
-- **`motion_stream(q1_tuple, q2_tuple) -> yields (path_list,)`**
-- **`plan_rrt_connect(q1_list, q2_list) -> List[List[float]] or None`**
-
-**Testing:**
-- **Unit tests** in `evaluation.py`:
-  - For two reachable, collision-free configs, assert `motion_stream` yields an interpolated path.
-  - For obstructed configs, assert `motion_stream` falls back to `plan_rrt_connect` and returns a valid path.
-- **Visualization test:** In `example.py`, plot or animate the returned path in PyBullet.
+**Testing:** Write `tests/test_task_planner.py` that asserts `plan_task(...)` returns expected `pick`/`place` sequence on a trivial 1-block problem.
 
 ---
-*With these interfaces and tests, each teammate can develop and validate their module in isolation before full integration.*
+### 2️⃣ IK & Collision Module
+**Files:** `planners/pddlstream_interface.py`, (optionally `collision.py`)
+
+```python
+# planners/pddlstream_interface.py
+from typing import Iterator, Tuple, List
+from simulation import SimulationEnvironment
+import pybullet as pb
+
+Config = Tuple[float, ...]
+Path = List[Config]
+
+def ik_stream(block_id: str,
+              grasp_pose: Tuple[float, ...]
+) -> Iterator[Tuple[Config,]]:
+    """Yield joint configurations for grasping `block_id` at `grasp_pose`."""
+    # use HW2 IK or PyBullet.call, then yield configs
+    ...
+
+def cfree_config(config: Config) -> bool:
+    """Return True if robot at `config` has no collisions."""
+    ...
+
+def traj_free(path: Path,
+              block_id: str
+) -> Iterator[()]:
+    """Yield () if carrying `block_id` along `path` is collision-free."""
+    ...
+
+# Register streams:
+STREAMS = {
+    'ik': StreamInfo(..., fn=from_fn(ik_stream)),
+    'cfree_config': StreamInfo(..., fn=from_fn(cfree_config)),
+    'traj_free': StreamInfo(..., fn=from_fn(traj_free)),
+}
+# Action schemas:
+ACTIONS = [FunctionInfo('pick', ...), FunctionInfo('move', ...), FunctionInfo('place', ...)]
+```
+
+**Testing:** In `tests/test_streams.py`:
+- `ik_stream`: yields >=1 config that passes `cfree_config`.
+- `cfree_config`: True on free config, False on known collision.
+- `traj_free`: yields `()` only on collision-free path.
+
+---
+### 3️⃣ Motion Planning Module
+**Files:** `planners/ompl_motion.py`, enhancements in `planners/pddlstream_interface.py`
+
+```python
+# planners/ompl_motion.py
+from typing import List, Optional
+Config = Tuple[float, ...]
+Path = List[Config]
+
+def plan_rrt_connect(
+    q1: List[float], q2: List[float], timeout: float = 1.0
+) -> Optional[Path]:
+    """Return a collision-free path or None."""
+    ...
+
+def motion_stream(
+    q1: Config, q2: Config
+) -> Iterator[Tuple[Path,]]:
+    """Interpolate, else fallback to RRT-Connect."""
+    # 1) linear interpolation + cfree_config check
+    # 2) if fails, plan_rrt_connect
+    ...
+```
+
+**Testing:** In `tests/test_motion.py`:
+- Check `motion_stream` yields correct path start/end.
+- For obstructed configs, assert fallback to `plan_rrt_connect`.
+
+---
+## ✅ Full Integration & End‐to‐End Test
+
+- **Controller** in `submission.py` stitches together `plan_task`, then calls `env.goto_position`, `env._step`, and `_add_block` as needed.
+- Run **end‐to‐end**: `python evaluation.py` prints stacking accuracy and errors.
+
+---
+*By following this unified framework, each teammate can develop, test, and integrate their component seamlessly.*
+
+## 🏃‍♂️ Usage
+
+```bash
+python simulation.py        # visualize arm
+python example.py           # demo controller
+python run_planner.py       # run PDDLStream+sim
+pytest tests/               # unit tests
+python evaluation.py        # full evaluation
+```
+
+- **Unit tests** in `tests/`:
+  ```bash
+  pytest tests/
+  ```
+- **End-to-end** simulation:
+  ```bash
+  python evaluation.py
+  ```
+  Reports % of blocks correctly stacked and error metrics.
+
+---
+## 🏃‍♂️ Usage Examples
+
+- **Standalone simulation**: `python simulation.py`
+- **Minimal demo**: `python example.py`
+- **Planner + sim**: `python run_planner.py`
+- **Full eval**: `python evaluation.py`
+
+---
+*Fill in STREAMS & ACTIONS, implement the stub functions above, then test!*
 
 
