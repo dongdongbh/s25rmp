@@ -119,3 +119,59 @@ This three-way split ensures clear ownership:
 - **B** guarantees each configuration and trajectory is collision-free,
 - **C** provides fast and reliable motion paths (interpolation + sampling-based fallback).
 
+---
+## 🔌 Module Interfaces & Testing
+
+To ensure smooth integration, each module exposes clear APIs and test procedures.
+
+### 1️⃣ Symbolic Task Planner
+**Files to modify/add:**
+- `pddl/domain.pddl` (actions, predicates)
+- `pddl/problem.pddl` (initial/goal)
+- `run_planner.py` (calls PDDLStream)
+
+**Interfaces & APIs:**
+- **Function:** `solve(domain_pddl, problem_pddl, streams, actions, planner, algorithm)`
+  - **Input:** paths to PDDL files, stream definitions from `planners/pddlstream_interface.py`, list of action schemas, planner settings
+  - **Output:** `plan`: list of `(action_name, parameters_dict)` plus bound stream outputs
+
+**Testing:**
+- **Unit test:** In `evaluation.py`, write a test that loads a trivial block-world (1 block) and asserts `solve(...)` returns the expected `pick`+`place` sequence.
+- **Manual test:** Run `python run_planner.py` with `pddl/problem.pddl` configured for a 2-block stack and verify console output of the action plan.
+
+### 2️⃣ IK & Collision Module
+**Files to modify/add:**
+- `planners/pddlstream_interface.py` (implement `ik_stream`, `cfree_config`, `traj_free`)
+- *(Optional)* `simulation.py` or a new `collision.py` for standalone FCL-based collision routines
+
+**Interfaces & APIs:**
+- **`ik_stream(block_id, grasp_pose) -> yields (config_tuple,)`**
+- **`cfree_config(config_tuple) -> bool`**
+- **`traj_free(path_list, block_id) -> yields () if free`**
+
+**Testing:**
+- **Unit tests** in `evaluation.py`:
+  - Call `ik_stream` for a known pose and validate joint angles satisfy FK within tolerance.
+  - Call `cfree_config` on both collision-free and known-colliding configurations.
+  - Call `traj_free` on a manually constructed short path and assert expected outcome.
+- **Simulation test:** In `example.py`, script that teleports the robot to an IK solution and checks for collisions in direct-mode PyBullet.
+
+### 3️⃣ Motion Planning Module
+**Files to modify/add:**
+- `planners/ompl_motion.py` (implement `plan_rrt_connect`)
+- `planners/pddlstream_interface.py` (enhance `motion_stream` logic)
+
+**Interfaces & APIs:**
+- **`motion_stream(q1_tuple, q2_tuple) -> yields (path_list,)`**
+- **`plan_rrt_connect(q1_list, q2_list) -> List[List[float]] or None`**
+
+**Testing:**
+- **Unit tests** in `evaluation.py`:
+  - For two reachable, collision-free configs, assert `motion_stream` yields an interpolated path.
+  - For obstructed configs, assert `motion_stream` falls back to `plan_rrt_connect` and returns a valid path.
+- **Visualization test:** In `example.py`, plot or animate the returned path in PyBullet.
+
+---
+*With these interfaces and tests, each teammate can develop and validate their module in isolation before full integration.*
+
+

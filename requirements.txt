@@ -1,0 +1,7 @@
+numpy
+scipy
+pybullet
+python-fcl
+trimesh
+# Optional:
+ompl-bindings
