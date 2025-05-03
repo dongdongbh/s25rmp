@@ -3,3 +3,9 @@ meshes/
 *.zip
 *~
 temp/
+/.idea
+requirements.txt
+requirements.txt
+Miniconda3-latest-Linux-x86_64.sh
+/prof
+install-ompl-ubuntu.sh
