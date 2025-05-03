@@ -1,71 +1,157 @@
-from typing import Tuple, List, Iterator
+# planners/pddlstream_interface.py
+
+from typing import Tuple, Iterator, List, Dict
 import pybullet as pb
-import numpy as np
+from pddlstream.language.stream import StreamInfo, PartialInputs
+from pddlstream.language.function import FunctionInfo
+from pddlstream.language.generator import from_fn
 from simulation import SimulationEnvironment
 
-# Type aliases for clarity
+# --- Type aliases ---------------------------------------------------------
+PhysicalPose  = Tuple[Tuple[float, float, float], Tuple[float, float, float, float]]
+WorldState    = Dict[str, PhysicalPose]
+SymbolicWorld = Dict[str, str]
+
+# --- Shared DIRECT-mode environment --------------------------------------
+# Create one persistent DIRECT-mode env and load robot & floor
+MASTER_ENV = SimulationEnvironment(show=False)
+
+# --- Helper: reset and populate MASTER_ENV -------------------------------
+def _make_env_from_world(world: WorldState) -> SimulationEnvironment:
+    """
+    Reset the shared DIRECT-mode env to its base state and add all blocks
+    according to `world`.
+    """
+    MASTER_ENV._reset()
+    for pos, quat in world.values():
+        MASTER_ENV._add_block(pos, quat)
+    return MASTER_ENV
+
+# --- Stream implementations -----------------------------------------------
 Config = Tuple[float, ...]
-Path = List[Config]
+Path   = List[Config]
 
-# STREAM samplers for PDDLStream
-
-def grasp_stream(block_id: str) -> Iterator[Tuple[Tuple[float, ...],]]:
-    """Generate candidate grasp poses (x,y,z,roll,pitch,yaw) for a given block."""
-    # Example: yield a fixed top-down grasp
-    env = SimulationEnvironment(show=False)
-    loc, quat = env.get_block_pose(block_id)
-    # Simple grasp at block center with fixed orientation
-    grasp = (loc[0], loc[1], loc[2] + 0.02, 0.0, 0.0, 0.0)
-    yield (grasp,)
-    env.close()
-
-
-def ik_stream(block_id: str,
-              grasp_pose: Tuple[float, float, float, float, float, float]
+def ik_stream(world: WorldState,
+              b: str,
+              l: str,
+              grasp: Tuple[float, ...]
 ) -> Iterator[Tuple[Config,]]:
-    """Yield joint configurations that achieve the given grasp on block."""
-    env = SimulationEnvironment(show=False)
-    # Replace with your HW2 IK solver. Here we use PyBullet's IK as placeholder.
-    pos = grasp_pose[:3]
-    orn = pb.getQuaternionFromEuler(grasp_pose[3:])
-    joint_angles = pb.calculateInverseKinematics(env.robot_id,
-                                                 env.joint_index['m6'],
-                                                 pos, orn)
-    config = tuple(joint_angles)
-    yield (config,)
-    env.close()
+    """
+    Dummy IK: return the current robot joint angles as a valid config.
+    """
+    env = _make_env_from_world(world)
+    q   = tuple(env._get_position())
+    yield (q,)
 
-
-def cfree_config(config: Config) -> bool:
-    """Return True if the robot at `config` is collision-free."""
-    env = SimulationEnvironment(show=False)
-    # Apply config
-    for i, angle in enumerate(config):
-        pb.resetJointState(env.robot_id, i, angle)
-    # Check for self-collisions and collisions with blocks
-    contacts = pb.getContactPoints(env.robot_id)
-    env.close()
+def cfree_config(world: WorldState,
+                 q: Config
+) -> bool:
+    """
+    True if moving the robot to q causes no collisions.
+    """
+    env = _make_env_from_world(world)
+    for j_idx, angle in enumerate(q):
+        pb.resetJointState(env.robot_id, j_idx, angle)
+    pb.stepSimulation()
+    contacts = pb.getContactPoints(bodyA=env.robot_id)
     return len(contacts) == 0
 
-def traj_free(
-    path: List[Tuple[float, ...]],
-    block_id: str
-) -> Iterator[tuple]:
+def motion_stream(world: WorldState,
+                  q1: Config,
+                  q2: Config
+) -> Iterator[Tuple[Path,]]:
     """
-    Test that carrying `block_id` along the joint‐space path incurs no collision.
-    Yields exactly one empty tuple if the entire path is safe; otherwise yields nothing.
+    Simple straight-line joint-space path.
     """
-    # You need access to your collision checker for the held block.
-    # Here we use `cfree_config` to check the robot+block at each config.
+    yield ([q1, q2],)
+
+def traj_free(world: WorldState,
+              path: Path,
+              b: str
+) -> Iterator[()]:
+    """
+    True if executing `path` causes no robot-to-environment collisions,
+    excluding any contact with the held block `b`.
+    """
+    env     = _make_env_from_world(world)
+    held_id = env.block_id.get(b, None)
+
     for q in path:
-        if not cfree_config(q, carried_block=block_id):
-            # collision detected; abort
-            return
-    # if we reach here, no collisions
-    yield ()
+        for j_idx, angle in enumerate(q):
+            pb.resetJointState(env.robot_id, j_idx, angle)
+        pb.stepSimulation()
 
+    contacts = pb.getContactPoints(bodyA=env.robot_id)
+    # filter out any contact with the held block
+    if held_id is not None:
+        contacts = [c for c in contacts if c[2] != held_id]
+    if not contacts:
+        yield ()
 
+def gen_loc_stream(symbolic: SymbolicWorld,
+                   base: str
+) -> Iterator[Tuple[int, str]]:
+    """
+    Lazily propose the next free location on `base`, given the current symbolic map.
+    """
+    used   = [loc for loc in symbolic.values() if loc.startswith(f"{base}_loc")]
+    levels = []
+    for loc in used:
+        try:
+            levels.append(int(loc.split("_loc",1)[1]))
+        except ValueError:
+            pass
+    next_level = max(levels) + 1 if levels else 0
+    new_loc     = f"{base}_loc{next_level}"
+    yield (next_level, new_loc)
 
-# Placeholder STREAMS and ACTIONS for planner integration
-STREAMS = {}
-ACTIONS = []
+# --- Register streams & actions ------------------------------------------
+STREAMS: Dict[str, StreamInfo] = {
+    'ik': StreamInfo(
+        inputs    = ['?w','?b','?l','?g'],
+        domain    = ['(Block ?b)','(Location ?l)'],
+        outputs   = ['?q'],
+        certified = ['(Kin ?b ?l ?q)'],
+        fn        = from_fn(ik_stream),
+        partial   = PartialInputs(share=True),
+    ),
+    'cfree_config': StreamInfo(
+        inputs    = ['?w','?q'],
+        domain    = ['(Config ?q)'],
+        outputs   = [],
+        certified = ['(CFreeConf ?q)'],
+        fn        = from_fn(cfree_config),
+        partial   = PartialInputs(share=True),
+    ),
+    'motion': StreamInfo(
+        inputs    = ['?w','?q1','?q2'],
+        domain    = ['(Config ?q1)','(Config ?q2)'],
+        outputs   = ['?t'],
+        certified = ['(Motion ?q1 ?t ?q2)'],
+        fn        = from_fn(motion_stream),
+        partial   = PartialInputs(share=True),
+    ),
+    'traj_free': StreamInfo(
+        inputs    = ['?w','?t','?b'],
+        domain    = ['(Motion ?q1 ?t ?q2)','(Holding ?b)'],
+        outputs   = [],
+        certified = ['(CFreeTraj ?t ?b)'],
+        fn        = from_fn(traj_free),
+        partial   = PartialInputs(share=True),
+    ),
+    'gen-loc': StreamInfo(
+        inputs    = ['?w','?base'],
+        domain    = ['(Base ?base)'],
+        outputs   = ['?level','?loc'],
+        certified = ['(Location ?loc)'],
+        fn        = from_fn(gen_loc_stream),
+        partial   = PartialInputs(share=True),
+    ),
+}
+
+ACTIONS: List[FunctionInfo] = [
+    FunctionInfo('pick',  inputs=['?b','?l','?g','?q'], outputs=[], costs=0),
+    FunctionInfo('move',  inputs=['?q1','?t','?q2'],      outputs=[], costs=0),
+    FunctionInfo('place', inputs=['?b','?l','?g','?q'], outputs=[], costs=0),
+]
+

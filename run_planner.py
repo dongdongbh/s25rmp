@@ -14,17 +14,17 @@ def plan_task(domain_path:str,
               action_list:List[FunctionInfo],
               planner:str='ff-astar',
               algorithm:str='adaptive'
-              ) -> List[Tuple[str, Dict]]:
+) -> List[Tuple[str, Dict]]:
     # If no streams/actions are yet defined, return a trivial pick→place plan
     if not stream_map or not action_list:
         return [('pick', {}), ('place', {})]
 
     # Otherwise invoke PDDLStream properly
     return solve(
-            domain=domain_path,
-            problem=problem_path,
-            streams=stream_map,
-            actions=action_list,
-            planner=planner,
-            algorithm=algorithm,
-            )
+        domain=domain_path,
+        problem=problem_path,
+        streams=stream_map,
+        actions=action_list,
+        planner=planner,
+        algorithm=algorithm,
+    )
