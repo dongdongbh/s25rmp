@@ -31,17 +31,47 @@ def _make_env_from_world(world: WorldState) -> SimulationEnvironment:
 Config = Tuple[float, ...]
 Path   = List[Config]
 
-def ik_stream(world: WorldState,
-              b: str,
-              l: str,
-              grasp: Tuple[float, ...]
+# def ik_stream(world: WorldState,
+#               b: str,
+#               l: str,
+#               grasp: Tuple[float, ...]
+# ) -> Iterator[Tuple[Config,]]:
+#     """
+#     Dummy IK: return the current robot joint angles as a valid config.
+#     """
+#     env = _make_env_from_world(world)
+#     q   = tuple(env._get_position())
+#     yield (q,)
+
+def ik_stream(world_state: WorldState,
+              block_id: str,
+              grasp_pose: Tuple[float, float, float, float, float, float]
 ) -> Iterator[Tuple[Config,]]:
     """
-    Dummy IK: return the current robot joint angles as a valid config.
+    Yield collision-free IK solutions for grasp_pose using PyBullet.
+    Tries multiple rest poses to find collision-free IK.
     """
-    env = _make_env_from_world(world)
-    q   = tuple(env._get_position())
-    yield (q,)
+    env = _reset_world(world_state)
+    pos = grasp_pose[:3]
+    orn = pb.getQuaternionFromEuler(grasp_pose[3:])
+    num_joints = len(env.joint_index)
+
+    for _ in range(10):  # Try 10 samples
+        rest_pose = [np.random.uniform(-np.pi, np.pi) for _ in range(num_joints)]
+        ik_solution = pb.calculateInverseKinematics(
+            env.robot_id, env.joint_index['m6'], pos, orn,
+            restPoses=rest_pose,
+            jointDamping=[0.1] * num_joints
+        )
+        config = tuple(ik_solution[:num_joints])
+
+        # Collision check
+        for i, angle in enumerate(config):
+            pb.resetJointState(env.robot_id, i, angle)
+        pb.stepSimulation()
+
+        if len(pb.getContactPoints(env.robot_id)) == 0:
+            yield (config,)
 
 def cfree_config(world: WorldState,
                  q: Config
