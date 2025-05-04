@@ -1,40 +1,51 @@
 (define (stream block_stack_streams)
-  ;; Inverse kinematics for pick & place:
+
+  ;; Inverse kinematics: needs world, block, location, and grasp token
   (:stream ik
     :inputs    (?w ?b ?l ?g)
-    :domain (and (World ?w) (Block ?b) (Location ?l) (Grasp ?g))
+    :domain    (and (World ?w) (Location ?l))
     :outputs   (?q)
     :certified (Kin ?b ?l ?q)
   )
 
-  ;; Collision-free config check
+  ;; Collision‑free config check: needs world and a config
   (:stream cfree_config
-    :inputs    (?w ?q)
-    :domain    (Config ?q)
-    :certified (CFreeConf ?q)
+   :inputs    (?w ?q)
+   :domain    (and (World ?w))    ; no ?b, no ?l
+   :outputs   ()
+   :certified (CFreeConf ?q)
   )
 
-  ;; Motion interpolation (with RRT fallback)  
+
+  ;; Motion interpolation: needs world + two configs
   (:stream motion
     :inputs    (?w ?q1 ?q2)
-    :domain    (and (Config ?q1) (Config ?q2))
+    :domain    (and (World ?w) (CFreeConf ?q1) (CFreeConf ?q2))
     :outputs   (?t)
     :certified (Motion ?q1 ?t ?q2)
   )
 
-  ;; Collision-free trajectory when carrying ?b
+  ;; Trajectory‐free: needs world, the same two configs, a trajectory, and which block
   (:stream traj_free
-   :inputs    (?w ?t ?b)
-   :domain    (and (Holding ?b))
-   :certified (CFreeTraj ?t ?b)
+    :inputs    (?w ?q1 ?t ?q2 ?b)
+    :domain    (and (World ?w)
+                    (Motion ?q1 ?t ?q2)
+                    (Holding ?b))
+    :outputs   ()
+    :certified (CFreeTraj ?t ?b)
   )
 
-  ;; Dynamically generate new stacking locations
+  ;; Generate new locations: needs world and a base
   (:stream gen-loc
     :inputs    (?w ?base)
-    :domain    (Base ?base)
+    :domain    (and (World ?w) (Base ?base))
     :outputs   (?level ?loc)
-    :certified (Location ?loc)
+    :certified
+     (and
+       (Location ?loc)
+       (Clear    ?loc)
+     )
   )
+
 )
 

@@ -7,22 +7,31 @@ sys.path.append(os.getcwd())
 
 from submission import Controller
 
+from planners.pddlstream_interface import extract_physical_world
+from simulation import SimulationEnvironment
+
 def main():
     ctrl = Controller()
 
     # Fake symbolic map: two blocks on two different bases/levels
     symbolic_map = {
         'b1': 'baseA_loc0',
-        'b2': 'baseB_loc1',
+        'b2': 'baseB_loc0',
+        'b3': 'baseB_loc1',
     }
     # Fake goal poses: only the location symbol is used
     goal_poses = {
-        'b1': ('baseA_loc2', None),
+        'b1': ('baseB_loc1', None),
         'b2': ('baseB_loc0', None),
+        'b3': ('baseA_loc0', None),
     }
 
-    # Build the PDDLStream problem tuple
-    pddl_prob = ctrl._make_pddlstream_problem(symbolic_map, goal_poses)
+    env = SimulationEnvironment(show=False)
+    world = extract_physical_world(env)
+    env.close()
+
+# now pass `world` into the problem builder
+    pddl_prob = ctrl._make_pddlstream_problem(symbolic_map, goal_poses, world)
 
     # Unpack the 6‐tuple returned by PDDLProblem
     domain_pddl, constant_map, stream_pddl, stream_map, init_list, goal_formula = pddl_prob
