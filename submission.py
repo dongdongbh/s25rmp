@@ -136,17 +136,18 @@ class Controller:
         for b, loc in symbolic_map.items():
             init.append(('At', b, loc))
             
-            # --- BOOTSTRAP STREAM FACTS FOR THIS AT(...) pair ---
-            # 1) Inverse kinematics: get one q
-            q, = next(ik_stream(world, b, loc, None))
-            init.append(('Kin', b, loc, q))
-            # 2) Collision‐free config
-            if cfree_config(world, q):
-                init.append(('CFreeConf', q))
-            # 3) A trivial motion from q to itself
-            t0 = f"traj_{b}"
-            init.append(('Motion', q, t0, q))
-            init.append(('CFreeTraj', t0, b))
+            # # --- BOOTSTRAP STREAM FACTS FOR THIS AT(...) pair ---
+            # # 1) Inverse kinematics: get one q
+            # q, = next(ik_stream(world, b, loc, None))
+            # init.append(('Kin', b, loc, q))
+            # # 2) Collision‐free config
+            # if cfree_config(world, q):
+            #     init.append(('CFreeConf', q))
+            # # 3) A trivial motion from q to itself
+            # t0 = f"traj_{b}"
+            # init.append(('Motion', q, t0, q))
+            # init.append(('CFreeTraj', t0, b))
+
         # Clear(...)
         occupied = set(symbolic_map.values())
         for base in self.base_pose_map:
