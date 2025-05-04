@@ -25,12 +25,10 @@ def ompl_path_to_list_config(path: og.PathGeometric, si: ob.SpaceInformation) ->
     space = si.getStateSpace()
     return [list(ompl_state_to_config(path.getState(i), space)) for i in range(path.getStateCount())]
 
-space_bounds = [(-2*math.pi, 2*math.pi)] * 6
-
-
 def plan_rrt_connect(q1: Config,
                      q2: Config,
                      seed: Optional[int] = None,
+                     space_bounds=None,
                      timeout: float = 1.0,
                      goal_threshold: float = 1e-3,
                      simplify_solution: bool = False,

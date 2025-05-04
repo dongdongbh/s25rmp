@@ -23,7 +23,7 @@ def main():
     # Block near baseA
     b1 = env._add_block((0.0, -0.14, base_z + CUBE_SIDE), quat, mass=2, side=CUBE_SIDE)
     # Block near baseB
-    b2 = env._add_block((0.0,  0.14, base_z + 2*CUBE_SIDE), quat, mass=2, side=CUBE_SIDE)
+    b2 = env._add_block((0.5,  0.14, base_z + 2*CUBE_SIDE), quat, mass=2, side=CUBE_SIDE)
     env.settle(1.0)
 
     # 1) Snapshot world
@@ -33,7 +33,7 @@ def main():
 
     # 2) Test ik_stream
     print("\n[ik_stream]")
-    ik_out = list(ik_stream(world, b1, "baseA_loc0", (0.5, 0.2, 0.1, 0.0, 1.57, 0.0)))
+    ik_out = list(ik_stream(world, 'b1', "baseA_loc0", None))
     print("  yields:", ik_out)
 
     # 3) Test cfree_config
@@ -50,7 +50,7 @@ def main():
     # 5) Test traj_free
     print("\n[traj_free]")
     # use 'nil' as the held-block placeholder
-    traj_ok = list(traj_free(world, mot_out[0][0], 'nil'))
+    traj_ok = list(traj_free(world, mot_out[0][0], 'b1'))
     print("  yields:", traj_ok)
 
     # 6) Test gen_loc_stream

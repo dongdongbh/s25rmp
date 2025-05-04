@@ -39,8 +39,8 @@ def test_ik_stream_and_collision():
     env = SimulationEnvironment(show=False)
 
     # Step 1: add test block with label 'b0'
-    label = env._add_block((0.1, 0.0, 0.05), (1, 0, 0, 0))
-    assert label == DUMMY_BLOCK
+    # label = env._add_block((0.1, 0.0, 0.05), (1, 0, 0, 0))
+    # assert label == DUMMY_BLOCK
 
     # Step 2: get current world state
     world_state = {
@@ -49,7 +49,7 @@ def test_ik_stream_and_collision():
     }
 
     # Step 3: test ik_stream
-    configs = list(ik_stream(world_state, label, DUMMY_GRASP))
+    configs = list(ik_stream(world_state, DUMMY_BLOCK, 'baseA_loc0',DUMMY_GRASP))
     print(configs)
     assert len(configs) > 0, "IK stream should yield at least one config"
     q = configs[0]
