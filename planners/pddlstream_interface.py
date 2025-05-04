@@ -51,7 +51,8 @@ def ik_stream(world_state: WorldState,
     Yield collision-free IK solutions for grasp_pose using PyBullet.
     Tries multiple rest poses to find collision-free IK.
     """
-    env = _make_env_from_world(world)
+    env = _make_env_from_world(world_state)
+
     pos = grasp_pose[:3]
     orn = pb.getQuaternionFromEuler(grasp_pose[3:])
     num_joints = len(env.joint_index)
