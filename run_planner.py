@@ -25,7 +25,7 @@ def plan_task(domain_path:str,
         problem=problem_path,
         streams=stream_map,
         actions=action_list,
-        constants={'?w': world_state},  # <--- 关键：绑定 world state
+        constants={'?w': world_state},  # <---  world state
         planner=planner,
         algorithm=algorithm,
     )
