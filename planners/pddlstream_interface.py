@@ -15,8 +15,12 @@ SymbolicWorld = Dict[str, str]
 Config        = Tuple[float, ...]
 Path          = List[Config]
 
+SYMBOLIC_MAP = {}   # type: Dict[str,str]
 
-
+def set_symbolic_map(symbolic_map: Dict[str,str]) -> None:
+    """Call this once, right after you infer your symbolic_map."""
+    SYMBOLIC_MAP.clear()
+    SYMBOLIC_MAP.update(symbolic_map)
 
 def _make_env(world: WorldState) -> SimulationEnvironment:
     """
@@ -54,40 +58,53 @@ def extract_physical_world(env: SimulationEnvironment) -> WorldState:
     return state
 
 
-def ik_stream(world: WorldState, b: str, l: str, grasp) -> Iterator[tuple]:
-    """Dummy IK: return zero‑vector of length 6."""
-    q = (0.0,) * 6
-    yield (q,)
+def ik_stream(world: WorldState, b: str, l) -> List[Tuple[Config]]:
+    q: Config = (0.0,) * 6
+    return [(q,)]
 
 def cfree_config(world: WorldState, q: Config) -> bool:
-    """Dummy collision check: always succeed."""
     return True
 
-def motion_stream(world: WorldState, q1: Config, q2: Config) -> Iterator[tuple]:
-    """Straight‑line path between two 6‑d configs."""
-    yield ([q1, q2],)
+def motion_stream(world: WorldState, q1: Config, q2: Config) -> List[Tuple[Path]]:
+    path: Path = (q1, q2)
+    return [(path,)]
 
-def traj_free(world: WorldState, path: Path, b: str) -> Iterator[tuple]:
-    """Dummy trajectory‑free: always succeed."""
-    yield ()
+def traj_free(world: WorldState, path: Path, b: str) -> List[Tuple]:
+    return [()]
 
-def gen_loc_stream(symbolic: SymbolicWorld, base: str) -> Iterator[Tuple[int,str]]:
+def gen_loc_stream(_world: WorldState, base: str):
     """
-    Lazily propose the next free location on `base`.
+    Returns the next free location on `base` using the already-captured
+    SYMBOLIC_MAP. This function now returns a single location string instead of level and location.
+    It also updates the SYMBOLIC_MAP with the newly generated location.
     """
-    used = [int(loc.split('_loc',1)[1])
-            for loc in symbolic.values()
-            if loc.startswith(f"{base}_loc")]
-    lvl = max(used)+1 if used else 0
-    yield (lvl, f"{base}_loc{lvl}")
+    used = []
+    prefix = f"{base}_loc"
+    
+    # Iterate over the symbolic map to determine used levels
+    for loc in SYMBOLIC_MAP.values():
+        if loc.startswith(prefix):
+            try:
+                lvl = int(loc.split(prefix, 1)[1])
+                used.append(lvl)
+            except ValueError:
+                pass
+    
+    # Determine the next available level
+    new_lvl = max(used) + 1 if used else 0
+    new_loc = f"{base}_loc{new_lvl}"
+
+    # Update the SYMBOLIC_MAP with the new location
+    SYMBOLIC_MAP[f"b{len(SYMBOLIC_MAP)}"] = new_loc  # Add a new block entry to the symbolic map
+
+    # Return the location string only, not the level
+    return [new_loc]  # Return only the new location as a list
 
 
-# Register streams for PDDLStream
 STREAMS: Dict[str, StreamInfo] = {
-    'ik':           StreamInfo(from_fn(ik_stream)),
-    'cfree_config': StreamInfo(from_fn(cfree_config)),
-    'motion':       StreamInfo(from_fn(motion_stream)),
-    'traj_free':    StreamInfo(from_fn(traj_free)),
-    'gen-loc':      StreamInfo(from_fn(gen_loc_stream)),
+    'ik'           : StreamInfo(from_fn(ik_stream)),
+    'cfree_config' : StreamInfo(from_fn(cfree_config)),
+    'motion'       : StreamInfo(from_fn(motion_stream)),
+    'traj_free'    : StreamInfo(from_fn(traj_free)),
+    'gen-loc'      : StreamInfo(from_fn(gen_loc_stream)),
 }
-

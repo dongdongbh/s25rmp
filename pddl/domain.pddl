@@ -21,6 +21,9 @@
     (Supported ?l)
     (OnFloor   ?l)
     (Above ?lower ?upper)
+    (Config ?q - config)
+    (Empty)
+    (Block   ?b - block)
 
 
     ;; continuous‐motion predicates (certified by streams)
