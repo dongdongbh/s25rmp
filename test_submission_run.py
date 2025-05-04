@@ -4,20 +4,10 @@ import pprint
 import numpy as np
 from pddlstream.language.constants import And
 
-# --- MONKEY‑PATCH: disable optimistic combination logic in Instantiator ---
-from pddlstream.algorithms.instantiation import Instantiator
 
-from pddlstream.language.stream import StreamInstance
-
-
-# no-op out the two combination methods
-Instantiator._add_combinations_relation = lambda self, stream, atoms: None
-Instantiator._add_combinations          = lambda self, stream, atoms: None
-StreamInstance.next_optimistic = lambda self: iter(())
-
-# --- end patch ---
 
 from pddlstream.algorithms.meta import solve
+from pddlstream.algorithms.incremental import solve_incremental
 
 from submission import Controller
 from simulation import SimulationEnvironment
@@ -58,13 +48,14 @@ def main():
     print("\nCalling solver...")
     solutions = solve(
         pddl_prob,
-        algorithm='adaptive',
+        algorithm='adaptive',      # <-- back to adaptive
         planner='ff-astar',
         stream_info=stream_info,
         unit_costs=True,
         max_planner_time=10,
         verbose=True,
         debug=True,
+        no_fluent_streams=True,
     )
 
     solution = solutions[0]

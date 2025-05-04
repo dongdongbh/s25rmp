@@ -4,17 +4,7 @@ import pybullet as pb
 import numpy as np
 from typing import Dict, List, Tuple
 
-# --- MONKEY‑PATCH: disable optimistic combination logic in Instantiator ---
-from pddlstream.algorithms.instantiation import Instantiator
-from pddlstream.language.stream import StreamInstance
 
-
-# no-op out the two combination methods
-Instantiator._add_combinations_relation = lambda self, stream, atoms: None
-Instantiator._add_combinations          = lambda self, stream, atoms: None
-StreamInstance.next_optimistic = lambda self: iter(())
-
-# --- end patch ---
 
 from pddlstream.language.constants import PDDLProblem, And, Atom
 from pddlstream.algorithms.meta import solve
@@ -67,6 +57,8 @@ class Controller:
         while True:
             # (1) Symbolic map block→location
             symbolic_map = self._infer_symbolic_map_from_env(real_env)
+            from planners.pddlstream_interface import set_symbolic_map
+            set_symbolic_map(symbolic_map)
 
 
             # EARLY EXIT: if every block is physically already at its goal, do nothing
@@ -136,17 +128,17 @@ class Controller:
         for b, loc in symbolic_map.items():
             init.append(('At', b, loc))
             
-            # # --- BOOTSTRAP STREAM FACTS FOR THIS AT(...) pair ---
-            # # 1) Inverse kinematics: get one q
-            # q, = ik_stream(world, b, loc, None)
-            # init.append(('Kin', b, loc, q))
-            # # 2) Collision‐free config
-            # if cfree_config(world, q):
-            #     init.append(('CFreeConf', q))
-            # # 3) A trivial motion from q to itself
-            # t0 = f"traj_{b}"
-            # init.append(('Motion', q, t0, q))
-            # init.append(('CFreeTraj', t0, b))
+            # --- BOOTSTRAP STREAM FACTS FOR THIS AT(...) pair ---
+            # 1) Inverse kinematics: get one q
+            q, = ik_stream(world, b, loc)
+            init.append(('Kin', b, loc, q))
+            # 2) Collision‐free config
+            if cfree_config(world, q):
+                init.append(('CFreeConf', q))
+            # 3) A trivial motion from q to itself
+            t0 = f"traj_{b}"
+            init.append(('Motion', q, t0, q))
+            init.append(('CFreeTraj', t0, b))
 
         # Clear(...) and Location(...)
         occupied = set(symbolic_map.values())
