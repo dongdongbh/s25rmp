@@ -43,7 +43,7 @@ Path   = List[Config]
 #     q   = tuple(env._get_position())
 #     yield (q,)
 
-def ik_stream(world_state: WorldState,
+def ik_stream(world: WorldState,
               block_id: str,
               grasp_pose: Tuple[float, float, float, float, float, float]
 ) -> Iterator[Tuple[Config,]]:
@@ -51,7 +51,7 @@ def ik_stream(world_state: WorldState,
     Yield collision-free IK solutions for grasp_pose using PyBullet.
     Tries multiple rest poses to find collision-free IK.
     """
-    env = _make_env_from_world(world_state)
+    env = _make_env_from_world(world)
 
     pos = grasp_pose[:3]
     orn = pb.getQuaternionFromEuler(grasp_pose[3:])
