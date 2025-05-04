@@ -148,20 +148,43 @@ class Controller:
             # init.append(('Motion', q, t0, q))
             # init.append(('CFreeTraj', t0, b))
 
-        # Clear(...)
+        # Clear(...) and Location(...)
         occupied = set(symbolic_map.values())
         for base in self.base_pose_map:
-            # assume at most len(symbolic_map)+1 levels
-            for lvl in range(len(symbolic_map) + 1):
+            # 1) Gather levels already in use on this base
+            prefix = f"{base}_loc"
+            levels = [
+                int(loc.split(prefix, 1)[1])
+                for loc in symbolic_map.values()
+                if loc.startswith(prefix)
+            ]
+            # 2) Compute the highest level (or -1 if none)
+            max_lvl = max(levels) if levels else -1
+
+            # 3) Seed Above relations for every existing level, plus one extra link
+            #    This makes both loc0→loc1 when max_lvl=-1,
+            #    and locN→locN+1 for N up to the real max.
+            for lvl in range(max_lvl + 1):
+                lower = f"{base}_loc{lvl}"
+                upper = f"{base}_loc{lvl+1}"
+                init.append(('Above', lower, upper))
+
+            # 4) Declare each spot as a valid Location and, if unoccupied, Clear
+            for lvl in range(max_lvl + 2):
                 loc_sym = f"{base}_loc{lvl}"
+                init.append(('Location', loc_sym))
                 if loc_sym not in occupied:
                     init.append(('Clear', loc_sym))
-        # Base(...) and Location(...)
-        for base in self.base_pose_map:
+
+            # 5) Table‐support for level‐0
             init.append(('Base', base))
-            init.append(('Location', f"{base}_loc0"))
+            init.append(('OnFloor', f"{base}_loc0"))
+
+
+        init.append(('World', 'w0'))
         # Empty
         init.append(('Empty',))
+        init.append(('Holding', 'nil'))
 
         # (b) Build goal formula
         goals: List[Tuple] = []
@@ -241,12 +264,20 @@ class Controller:
         if action in ('pick','place'):
             return cfree_config(world, params['?q'])
         if action == 'move':
-            q1,q2 = params['?q1'], params['?q2']
+            # read the block you’re carrying directly from the PDDL binding
+            b   = params['?b']
+            q1  = params['?q1']
+            q2  = params['?q2']
+
+            # sample motion paths, motion_stream returns a list of paths
             for (path,) in motion_stream(world, q1, q2):
+                # check that every waypoint is a collision-free robot configuration
                 if not all(cfree_config(world, q) for q in path):
                     continue
-                if list(traj_free(world, path, 'nil')):
+                # check that this path is collision-free *with* block b
+                if list(traj_free(world, path, b)):
                     return True
+
             return False
         return True
 

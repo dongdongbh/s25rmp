@@ -1,7 +1,12 @@
 (define (domain block_stack)
-  (:requirements :strips :negative-preconditions)
+    (:requirements 
+    :strips 
+    :typing 
+    :negative-preconditions 
+    :existential-preconditions   
+    :derived-predicates          
+  )
 
-  ;; no :types section — all arguments are untyped
 
   (:constants
     nil w0 baseA baseB baseC baseD baseE baseF baseG baseH
@@ -11,8 +16,12 @@
     ;; discrete state
     (At       ?b ?l)
     (Clear    ?l)
-    (Empty)
     (Holding  ?b)
+    (World    ?w - world)
+    (Supported ?l)
+    (OnFloor   ?l)
+    (Above ?lower ?upper)
+
 
     ;; continuous‐motion predicates (certified by streams)
     (Kin       ?b ?l ?q)
@@ -24,27 +33,45 @@
     (Base     ?B)
     (Location ?l)
   )
+  ;;----------------------------------------
+  ;; Axiom: Supported if OnFloor or if a block is AT in a spot below
+  ;;----------------------------------------
+  (:derived (Supported ?l)
+   (or
+    (OnFloor ?l)
+    (exists (?lower - location
+             ?b     - block)
+     (and
+      (Above ?lower ?l)
+      (At    ?b      ?lower)
+      (not (= ?b nil))
+     )
+    )
+   )
+  )
 
   (:action pick
     :parameters (?b ?l ?q)
     :precondition (and
+      (Holding  nil)
+      (not (= ?b nil))
       (At        ?b ?l)
-      (Empty)
+      (Location   ?l)
       (Kin       ?b ?l ?q)
       (CFreeConf ?q)
     )
     :effect (and
       (not (At        ?b ?l))
-      (not (Empty))
+      (not (Holding  nil))
       (Holding     ?b)
       (Clear       ?l)
     )
   )
 
   (:action move
-    :parameters (?q1 ?t ?q2)
+    :parameters (?b ?q1 ?t ?q2)
     :precondition (and
-      (Empty)
+      (Holding    ?b)
       (Motion     ?q1 ?t ?q2)
       (CFreeTraj  ?t nil)
       (CFreeConf  ?q2)
@@ -56,15 +83,18 @@
     :parameters (?b ?l ?q)
     :precondition (and
       (Holding    ?b)
+      (not (= ?b nil))
+      (Location   ?l)
       (Clear      ?l)
+      (Supported  ?l)
       (Kin        ?b ?l ?q)
       (CFreeConf  ?q)
     )
     :effect (and
       (At       ?b ?l)
       (not (Clear      ?l))
-      (Empty)
       (not (Holding ?b))
+      (Holding  nil)
     )
   )
 )
