@@ -4,14 +4,16 @@
   (:objects
     b0
       - block
+    baseA baseB baseC baseD baseE baseF baseG baseH
+      - base
     l0 l1
       baseA_loc0 baseB_loc0 baseC_loc0 baseD_loc0
       baseE_loc0 baseF_loc0 baseG_loc0 baseH_loc0
       - location
-    q_home q1
-      - config
-    t_dummy
-      - traj
+    ;;q_home q1
+     ;; - config
+    ;;t_dummy
+     ;; - traj
   )
 
   (:init
@@ -37,20 +39,20 @@
     (Empty)
 
     ;; known IK: pick from l0, place at l1
-    (Kin      b0 l0 q_home)
-    (Kin      b0 l1 q1)
+    ;;(Kin      b0 l0 q_home)
+    ;;(Kin      b0 l1 q1)
 
     ;; both configs collision‑free
-    (CFreeConf q_home)
-    (CFreeConf q1)
+    ;;(CFreeConf q_home)
+    ;;(CFreeConf q1)
 
     ;; known free‑space motion
-    (Motion     q_home t_dummy q1)
-    (CFreeTraj  t_dummy nil)
+    ;;(Motion     q_home t_dummy q1)
+    ;;(CFreeTraj  t_dummy nil)
   )
 
   (:goal
-    (At b0 l1)
+    (and (At b0 l1))
   )
 )
 
