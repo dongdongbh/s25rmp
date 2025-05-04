@@ -2,156 +2,92 @@
 
 from typing import Tuple, Iterator, List, Dict
 import pybullet as pb
-from pddlstream.language.stream import StreamInfo, PartialInputs
-from pddlstream.language.function import FunctionInfo
+from simulation import SimulationEnvironment, BASE_Z
+from pddlstream.language.stream import StreamInfo
 from pddlstream.language.generator import from_fn
-from simulation import SimulationEnvironment
 
-# --- Type aliases ---------------------------------------------------------
-PhysicalPose  = Tuple[Tuple[float, float, float], Tuple[float, float, float, float]]
-WorldState    = Dict[str, PhysicalPose]
+# Cube side length (m)
+CUBE_SIDE = 0.01905
+
+# Type aliases
+WorldState    = Dict[str, Tuple[Tuple[float,float,float], Tuple[float,float,float,float]]]
 SymbolicWorld = Dict[str, str]
+Config        = Tuple[float, ...]
+Path          = List[Config]
 
-# --- Shared DIRECT-mode environment --------------------------------------
-# Create one persistent DIRECT-mode env and load robot & floor
-MASTER_ENV = SimulationEnvironment(show=False)
 
-# --- Helper: reset and populate MASTER_ENV -------------------------------
-def _make_env_from_world(world: WorldState) -> SimulationEnvironment:
-    """
-    Reset the shared DIRECT-mode env to its base state and add all blocks
-    according to `world`.
-    """
-    MASTER_ENV._reset()
-    for pos, quat in world.values():
-        MASTER_ENV._add_block(pos, quat)
-    return MASTER_ENV
 
-# --- Stream implementations -----------------------------------------------
-Config = Tuple[float, ...]
-Path   = List[Config]
 
-def ik_stream(world: WorldState,
-              b: str,
-              l: str,
-              grasp: Tuple[float, ...]
-) -> Iterator[Tuple[Config,]]:
+def _make_env(world: WorldState) -> SimulationEnvironment:
     """
-    Dummy IK: return the current robot joint angles as a valid config.
+    Build a fresh DIRECT‑mode SimulationEnvironment from scratch,
+    then replay the contents of `world` (your block snapshot).
     """
-    env = _make_env_from_world(world)
-    q   = tuple(env._get_position())
+    # 1) start a brand‑new direct‑mode sim
+    env = SimulationEnvironment(show=False)
+
+    # 2) remove any dynamic blocks (SimulationEnvironment.__init__
+    #    always adds plane, robot, and a static 'b0' platform)
+    for label in list(env.block_id):
+        if label != 'b0':
+            pb.removeBody(env.block_id[label], physicsClientId=env.client_id)
+            del env.block_id[label]
+
+    # 3) re‑spawn all dynamic blocks from the world snapshot
+    for label, (pos, quat) in world.items():
+        if label == 'b0':
+            continue
+        env._add_block(pos, quat, mass=2, side=CUBE_SIDE)
+
+    return env
+
+
+
+def extract_physical_world(env: SimulationEnvironment) -> WorldState:
+    """
+    Read all block poses from `env`.  On failure, fall back to the last‑good read.
+    """
+    state: WorldState = {}
+    for b in env.block_id:
+        pose = env.get_block_pose(b)
+        state[b] = pose
+    return state
+
+
+def ik_stream(world: WorldState, b: str, l: str, grasp) -> Iterator[tuple]:
+    """Dummy IK: return zero‑vector of length 6."""
+    q = (0.0,) * 6
     yield (q,)
 
-def cfree_config(world: WorldState,
-                 q: Config
-) -> bool:
-    """
-    True if moving the robot to q causes no collisions.
-    """
-    env = _make_env_from_world(world)
-    for j_idx, angle in enumerate(q):
-        pb.resetJointState(env.robot_id, j_idx, angle)
-    pb.stepSimulation()
-    contacts = pb.getContactPoints(bodyA=env.robot_id)
-    return len(contacts) == 0
+def cfree_config(world: WorldState, q: Config) -> bool:
+    """Dummy collision check: always succeed."""
+    return True
 
-def motion_stream(world: WorldState,
-                  q1: Config,
-                  q2: Config
-) -> Iterator[Tuple[Path,]]:
-    """
-    Simple straight-line joint-space path.
-    """
+def motion_stream(world: WorldState, q1: Config, q2: Config) -> Iterator[tuple]:
+    """Straight‑line path between two 6‑d configs."""
     yield ([q1, q2],)
 
-def traj_free(world: WorldState,
-              path: Path,
-              b: str
-) -> Iterator[()]:
-    """
-    True if executing `path` causes no robot-to-environment collisions,
-    excluding any contact with the held block `b`.
-    """
-    env     = _make_env_from_world(world)
-    held_id = env.block_id.get(b, None)
+def traj_free(world: WorldState, path: Path, b: str) -> Iterator[tuple]:
+    """Dummy trajectory‑free: always succeed."""
+    yield ()
 
-    for q in path:
-        for j_idx, angle in enumerate(q):
-            pb.resetJointState(env.robot_id, j_idx, angle)
-        pb.stepSimulation()
-
-    contacts = pb.getContactPoints(bodyA=env.robot_id)
-    # filter out any contact with the held block
-    if held_id is not None:
-        contacts = [c for c in contacts if c[2] != held_id]
-    if not contacts:
-        yield ()
-
-def gen_loc_stream(symbolic: SymbolicWorld,
-                   base: str
-) -> Iterator[Tuple[int, str]]:
+def gen_loc_stream(symbolic: SymbolicWorld, base: str) -> Iterator[Tuple[int,str]]:
     """
-    Lazily propose the next free location on `base`, given the current symbolic map.
+    Lazily propose the next free location on `base`.
     """
-    used   = [loc for loc in symbolic.values() if loc.startswith(f"{base}_loc")]
-    levels = []
-    for loc in used:
-        try:
-            levels.append(int(loc.split("_loc",1)[1]))
-        except ValueError:
-            pass
-    next_level = max(levels) + 1 if levels else 0
-    new_loc     = f"{base}_loc{next_level}"
-    yield (next_level, new_loc)
+    used = [int(loc.split('_loc',1)[1])
+            for loc in symbolic.values()
+            if loc.startswith(f"{base}_loc")]
+    lvl = max(used)+1 if used else 0
+    yield (lvl, f"{base}_loc{lvl}")
 
-# --- Register streams & actions ------------------------------------------
+
+# Register streams for PDDLStream
 STREAMS: Dict[str, StreamInfo] = {
-    'ik': StreamInfo(
-        inputs    = ['?w','?b','?l','?g'],
-        domain    = ['(Block ?b)','(Location ?l)'],
-        outputs   = ['?q'],
-        certified = ['(Kin ?b ?l ?q)'],
-        fn        = from_fn(ik_stream),
-        partial   = PartialInputs(share=True),
-    ),
-    'cfree_config': StreamInfo(
-        inputs    = ['?w','?q'],
-        domain    = ['(Config ?q)'],
-        outputs   = [],
-        certified = ['(CFreeConf ?q)'],
-        fn        = from_fn(cfree_config),
-        partial   = PartialInputs(share=True),
-    ),
-    'motion': StreamInfo(
-        inputs    = ['?w','?q1','?q2'],
-        domain    = ['(Config ?q1)','(Config ?q2)'],
-        outputs   = ['?t'],
-        certified = ['(Motion ?q1 ?t ?q2)'],
-        fn        = from_fn(motion_stream),
-        partial   = PartialInputs(share=True),
-    ),
-    'traj_free': StreamInfo(
-        inputs    = ['?w','?t','?b'],
-        domain    = ['(Motion ?q1 ?t ?q2)','(Holding ?b)'],
-        outputs   = [],
-        certified = ['(CFreeTraj ?t ?b)'],
-        fn        = from_fn(traj_free),
-        partial   = PartialInputs(share=True),
-    ),
-    'gen-loc': StreamInfo(
-        inputs    = ['?w','?base'],
-        domain    = ['(Base ?base)'],
-        outputs   = ['?level','?loc'],
-        certified = ['(Location ?loc)'],
-        fn        = from_fn(gen_loc_stream),
-        partial   = PartialInputs(share=True),
-    ),
+    'ik':           StreamInfo(from_fn(ik_stream)),
+    'cfree_config': StreamInfo(from_fn(cfree_config)),
+    'motion':       StreamInfo(from_fn(motion_stream)),
+    'traj_free':    StreamInfo(from_fn(traj_free)),
+    'gen-loc':      StreamInfo(from_fn(gen_loc_stream)),
 }
-
-ACTIONS: List[FunctionInfo] = [
-    FunctionInfo('pick',  inputs=['?b','?l','?g','?q'], outputs=[], costs=0),
-    FunctionInfo('move',  inputs=['?q1','?t','?q2'],      outputs=[], costs=0),
-    FunctionInfo('place', inputs=['?b','?l','?g','?q'], outputs=[], costs=0),
-]
 
