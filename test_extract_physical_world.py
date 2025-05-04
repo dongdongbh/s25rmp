@@ -2,7 +2,7 @@
 
 import pybullet as pb
 from simulation import SimulationEnvironment
-from planners.pddlstream_interface import extract_physical_world, _SHARED_WORLD
+from planners.pddlstream_interface import extract_physical_world#, _SHARED_WORLD
 
 def main():
     print("=== Starting extract_physical_world test ===")

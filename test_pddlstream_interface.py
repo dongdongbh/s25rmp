@@ -33,7 +33,7 @@ def main():
 
     # 2) Test ik_stream
     print("\n[ik_stream]")
-    ik_out = list(ik_stream(world, b1, "baseA_loc0", ()))
+    ik_out = list(ik_stream(world, b1, "baseA_loc0", (0.5, 0.2, 0.1, 0.0, 1.57, 0.0)))
     print("  yields:", ik_out)
 
     # 3) Test cfree_config

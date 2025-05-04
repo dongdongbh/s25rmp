@@ -33,7 +33,8 @@ def plan_rrt_connect(q1: Config,
                      seed: Optional[int] = None,
                      timeout: float = 1.0,
                      goal_threshold: float = 1e-3,
-                     simplify_solution: bool = False
+                     simplify_solution: bool = False,
+                     world=None
                      ) -> Optional[Path]:
     """
     A very simple “free-space RRT-Connect” stub:
@@ -48,8 +49,8 @@ def plan_rrt_connect(q1: Config,
     #         return None
     #     path.append(q)
     # Setting the seed
-    if seed is not None:
-        ob.RNG.setSeed(seed)
+    # if seed is not None:
+    #     ou.RNG.setSeed(seed)
 
     dim = len(q1)
     if dim != len(q2):
@@ -65,7 +66,7 @@ def plan_rrt_connect(q1: Config,
 
     def isStateValid(state: ob.State) -> bool:
         config = ompl_state_to_config(state, space)
-        return cfree_config(config)
+        return cfree_config(world, config)
 
     ss.setStateValidityChecker(ob.StateValidityCheckerFn(isStateValid))
 
