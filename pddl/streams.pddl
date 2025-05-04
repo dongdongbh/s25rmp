@@ -24,9 +24,9 @@
 
   ;; Collision-free trajectory when carrying ?b
   (:stream traj_free
-    :inputs    (?w ?t ?b)
-    :domain    (and (Motion ?q1 ?t ?q2) (Holding ?b))
-    :certified (CFreeTraj ?t ?b)
+   :inputs    (?w ?t ?b)
+   :domain    (and (Holding ?b))
+   :certified (CFreeTraj ?t ?b)
   )
 
   ;; Dynamically generate new stacking locations

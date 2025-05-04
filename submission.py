@@ -4,6 +4,18 @@ import pybullet as pb
 import numpy as np
 from typing import Dict, List, Tuple
 
+# --- MONKEY‑PATCH: disable optimistic combination logic in Instantiator ---
+from pddlstream.algorithms.instantiation import Instantiator
+from pddlstream.language.stream import StreamInstance
+
+
+# no-op out the two combination methods
+Instantiator._add_combinations_relation = lambda self, stream, atoms: None
+Instantiator._add_combinations          = lambda self, stream, atoms: None
+StreamInstance.next_optimistic = lambda self: iter(())
+
+# --- end patch ---
+
 from pddlstream.language.constants import PDDLProblem, And, Atom
 from pddlstream.algorithms.meta import solve
 
@@ -13,6 +25,7 @@ from planners.pddlstream_interface import (
     extract_physical_world,
     ik_stream, cfree_config,
     motion_stream, traj_free, gen_loc_stream,
+    WorldState,
 )
 
 # No Python‐side ACTIONS list—our PDDL actions come from domain.pddl
@@ -55,9 +68,33 @@ class Controller:
             # (1) Symbolic map block→location
             symbolic_map = self._infer_symbolic_map_from_env(real_env)
 
-            pddl_prob = self._make_pddlstream_problem(symbolic_map, goal_poses)
+
+            # EARLY EXIT: if every block is physically already at its goal, do nothing
+            all_at_goal = True
+            for b, (goal_loc, goal_quat) in goal_poses.items():
+                # get actual pose
+                actual_loc, actual_quat = real_env.get_block_pose(b)
+                # check positional tolerance
+                if any(abs(actual_loc[i] - goal_loc[i]) > CUBE_SIDE/2 for i in range(3)):
+                    all_at_goal = False
+                    break
+                # check rotational tolerance (quaternion inner product)
+                dot = sum(a*q for a,q in zip(actual_quat, goal_quat))
+                if abs(abs(dot) - 1.0) > 1e-3:
+                    all_at_goal = False
+                    break
+            if all_at_goal:
+                return
+
+
+            # grab the real‐world snapshot for streaming
+            world = extract_physical_world(real_env)
+
+            pddl_prob = self._make_pddlstream_problem(symbolic_map,
+                                           goal_poses,
+                                           world)
             # Now call solve with our StreamInfo metadata
-            solution, = solve(
+            solutions = solve(
                 pddl_prob,
                 algorithm='adaptive',
                 planner='ff-astar',
@@ -66,26 +103,51 @@ class Controller:
                 verbose=False,
                 debug=False,
             )
+            solution = solutions[0]
             # (4) Validate & execute
             if self._validate_and_execute(real_env, solution):
                 break
 
     def _make_pddlstream_problem(self,
                                  symbolic_map: Dict[str,str],
-                                 goal_poses: Dict[str,Tuple]
+                                 goal_poses: Dict[str,Tuple],
+                                 world: WorldState
                                  ) -> PDDLProblem:
+
         """
         Constructs and returns a PDDLProblem(domain, consts, stream_pddl,
                                             stream_map, init_list, goal_formula).
         """
-        # No extra constants
-        constant_map = {}
+        # Map the PDDL constants to Python objects:
+        #  - 'w0' is the world snapshot for streams
+        #  - 'nil' is our “no‐block” placeholder
+        #  - each baseX constant just maps to its own name string
+        constant_map = {
+            'w0': world,
+            'nil': None,
+        }
+        # bind all of your base names
+        for base in self.base_pose_map:
+            constant_map[base.lower()] = base
 
         # (a) Build init list
         init: List[Tuple] = []
         # At(...)
         for b, loc in symbolic_map.items():
             init.append(('At', b, loc))
+            
+            # # --- BOOTSTRAP STREAM FACTS FOR THIS AT(...) pair ---
+            # # 1) Inverse kinematics: get one q
+            # q, = next(ik_stream(world, b, loc, None))
+            # init.append(('Kin', b, loc, q))
+            # # 2) Collision‐free config
+            # if cfree_config(world, q):
+            #     init.append(('CFreeConf', q))
+            # # 3) A trivial motion from q to itself
+            # t0 = f"traj_{b}"
+            # init.append(('Motion', q, t0, q))
+            # init.append(('CFreeTraj', t0, b))
+
         # Clear(...)
         occupied = set(symbolic_map.values())
         for base in self.base_pose_map:
@@ -107,8 +169,13 @@ class Controller:
             goals.append(('At', b, loc))
         goal_formula = And(*goals)
 
-        # --- split out the two maps ---
-        # 1) generator map: name → Python callable
+        # load the PDDL text
+        with open(self.domain_pddl) as f:
+            domain_pddl_str = f.read()
+        with open(self.stream_pddl) as f:
+            stream_pddl_str = f.read()
+
+    # 1) generator map: name → Python callable
         gen_map = {
             'ik'           : ik_stream,
             'cfree_config' : cfree_config,
@@ -116,18 +183,16 @@ class Controller:
             'traj_free'    : traj_free,
             'gen-loc'      : gen_loc_stream,
         }
-        # 2) stream_info (imported at top) is name → StreamInfo metadata
 
-        # Finally build the problem
+        # build and return PDDLProblem from the actual PDDL text
         return PDDLProblem(
-            self.domain_pddl,    # domain PDDL file
-            constant_map,        # any extra constants
-            self.stream_pddl,    # stream PDDL file
-            gen_map,             # the **generator** map
-            init,                # init facts
-            goal_formula,        # And(*goal_facts)
+            domain_pddl_str,    # <-- now the file’s contents
+            constant_map,
+            stream_pddl_str,    # <-- also contents here
+            gen_map,
+            init,
+            goal_formula,
         )
-
     def _infer_symbolic_map_from_env(self,
                                      env: SimulationEnvironment
                                      ) -> Dict[str,str]:
