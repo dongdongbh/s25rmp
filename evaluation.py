@@ -93,7 +93,7 @@ if __name__ == "__main__":
     controller = Controller()
 
     # sample a validation trial
-    env, goal_poses = sample_trial(num_blocks=20, num_swaps=1)
+    env, goal_poses = sample_trial(num_blocks=20, num_swaps=1, show=False)
 
     # check camera image
     rgba, _, _ = env.get_camera_image()

@@ -98,7 +98,7 @@ def ik_stream(world: WorldState, b: str, l: str, grasp) -> Iterator[tuple]:
     # print("Robot Collision Shape:", robot_collision_shape_info)
     # print("Block Collision Shape:", block_collision_shape_info)
 
-    for attempt in range(1):  # Try 10 samples
+    for attempt in range(10):  # Try 10 samples
         current_state = [pb.getJointState(env.robot_id, i)[0] for i in range(num_joints)]
         angle_range = np.pi / max(1e-3, (4 - attempt / 2))
         rest_pose = [np.random.uniform(max(-np.pi, c - angle_range),
@@ -115,6 +115,7 @@ def ik_stream(world: WorldState, b: str, l: str, grasp) -> Iterator[tuple]:
         # Collision check
         if cfree_config(world, config):
             yield (config,)
+            return
         # for i, angle in enumerate(config):
         #     pb.resetJointState(env.robot_id, i, angle)
         # for _ in range(10):
@@ -160,13 +161,13 @@ def cfree_config(world: WorldState,
 
 def motion_stream(world: WorldState, q1: Config, q2: Config) -> Iterator[tuple]:
     """Straight‑line path between two 6‑d configs."""
-    # num_steps = 20
-    # weights = np.linspace(0, 1, num_steps)
-    # straight = [tuple((1 - w)*a + w*b for a, b in zip(q1, q2))
-    #             for w in weights]
-    # if all(cfree_config(world, q) for q in straight):
-    #     yield (straight,)
-    #     return
+    num_steps = 20
+    weights = np.linspace(0, 1, num_steps)
+    straight = [tuple((1 - w)*a + w*b for a, b in zip(q1, q2))
+                for w in weights]
+    if all(cfree_config(world, q) for q in straight):
+        yield (straight,)
+        return
     from .ompl_motion import plan_rrt_connect
     from ompl import util as ou
     import math
@@ -174,6 +175,7 @@ def motion_stream(world: WorldState, q1: Config, q2: Config) -> Iterator[tuple]:
     timeout = 0.5
     space_bounds = [(-math.pi,  math.pi)] * 6
     ou.RNG().setSeed(1)
+    print('Attempt to plan rrt connect---')
     for seed in range(max_rrt_attempts):
         rrt_path = plan_rrt_connect(list(q1), list(q2), seed=seed, timeout=timeout, world=world, space_bounds=space_bounds)
         if rrt_path is not None:
