@@ -1,88 +1,103 @@
-;; pddl/domain.pddl
-  (define (domain block_stack)
-   (:requirements :strips :typing :negative-preconditions)
-
-   (:types
-    block      ; each cube
-    location   ; base positions
-    base       ; stack‑bases
-    config     ; robot joint configurations
-    traj       ; robot‑space trajectories
-    world
-   )
-
-   (:constants
-    nil    - block
-    w0     - world
-    baseA baseB baseC baseD baseE baseF baseG baseH  - base
-   )
+(define (domain block_stack)
+    (:requirements 
+    :strips 
+    :typing 
+    :negative-preconditions 
+    :existential-preconditions   
+    :derived-predicates          
+  )
 
 
-   (:predicates
-    ;; where each block lives
-    (At      ?b - block   ?l - location)
-    (Clear   ?l - location)            ; no block currently occupying ?l
+  (:constants
+    nil w0 baseA baseB baseC baseD baseE baseF baseG baseH
+  )
 
-    ;; hand‐state
-    (Empty)                           ; gripper is empty
-    (Holding ?b - block)              ; gripper holds block ?b
+  (:predicates
+    ;; discrete state
+    (At       ?b ?l)
+    (Clear    ?l)
+    (Holding  ?b)
+    (World    ?w - world)
+    (Supported ?l)
+    (OnFloor   ?l)
+    (Above ?lower ?upper)
+    (Config ?q - config)
+    (Empty)
+    (Block   ?b - block)
 
-    ;; continuous‐motion predicates (to be certified by streams)
-    (Kin        ?b - block ?l - location ?q - config)
-    (CFreeConf  ?q - config)                       ; q is collision‐free
-    (Motion     ?q1 - config ?t - traj ?q2 - config)
-    (CFreeTraj  ?t - traj   ?b - block)             ; carrying ?b along t is free
-    (Base  ?b - base)
-    (Location ?l - location)
-   )
 
-   (:action pick
-    :parameters (?b - block ?l - location ?q - config)
-    :precondition  ; 
-    (and
-     (At         ?b ?l)
-     (Empty)
-     (Kin        ?b ?l ?q)
-     (CFreeConf  ?q)
-    )
-    :effect
-    (and
-     (not (At       ?b ?l))
-     (not (Empty))
-     (Holding     ?b)
-     (Clear       ?l)
+    ;; continuous‐motion predicates (certified by streams)
+    (Kin       ?b ?l ?q)
+    (CFreeConf ?q)
+    (Motion    ?q1 ?t ?q2)
+    (CFreeTraj ?t ?b)
+
+    ;; stack‐bases & generated locations
+    (Base     ?B)
+    (Location ?l)
+  )
+  ;;----------------------------------------
+  ;; Axiom: Supported if OnFloor or if a block is AT in a spot below
+  ;;----------------------------------------
+  (:derived (Supported ?l)
+   (or
+    (OnFloor ?l)
+    (exists (?lower - location
+             ?b     - block)
+     (and
+      (Above ?lower ?l)
+      (At    ?b      ?lower)
+      (not (= ?b nil))
+     )
     )
    )
+  )
 
-   (:action move
-    :parameters (?q1 - config ?t - traj ?q2 - config)
-    :precondition
-    (and
-     (Empty)
-     (Motion    ?q1 ?t ?q2)
-     (CFreeTraj ?t nil)
-     (CFreeConf ?q2)
+  (:action pick
+    :parameters (?b ?l ?q)
+    :precondition (and
+      (Holding  nil)
+      (not (= ?b nil))
+      (At        ?b ?l)
+      (Location   ?l)
+      (Kin       ?b ?l ?q)
+      (CFreeConf ?q)
     )
-    :effect
-    (and)  ; empty effect is allowed
-   )
+    :effect (and
+      (not (At        ?b ?l))
+      (not (Holding  nil))
+      (Holding     ?b)
+      (Clear       ?l)
+    )
+  )
 
-   (:action place
-    :parameters (?b - block ?l - location ?q - config)
-    :precondition  ; 
-    (and
-     (Holding   ?b)
-     (Clear     ?l)
-     (Kin       ?b ?l ?q)
-     (CFreeConf ?q)
+  (:action move
+    :parameters (?b ?q1 ?t ?q2)
+    :precondition (and
+      (Holding    ?b)
+      (Motion     ?q1 ?t ?q2)
+      (CFreeTraj  ?t nil)
+      (CFreeConf  ?q2)
     )
-    :effect
-    (and
-     (At       ?b ?l)
-     (not (Clear    ?l))
-     (Empty)
-     (not (Holding ?b))
-    )
-   )
-   )
+    :effect (and)
+  )
 
+  (:action place
+    :parameters (?b ?l ?q)
+    :precondition (and
+      (Holding    ?b)
+      (not (= ?b nil))
+      (Location   ?l)
+      (Clear      ?l)
+      (Supported  ?l)
+      (Kin        ?b ?l ?q)
+      (CFreeConf  ?q)
+    )
+    :effect (and
+      (At       ?b ?l)
+      (not (Clear      ?l))
+      (not (Holding ?b))
+      (Holding  nil)
+    )
+  )
+)
