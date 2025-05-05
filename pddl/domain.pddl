@@ -56,6 +56,7 @@
   (:action pick
     :parameters (?b ?l ?q)
     :precondition (and
+        (Config ?q)
       (Holding  nil)
       (not (= ?b nil))
       (At        ?b ?l)
@@ -75,16 +76,21 @@
     :parameters (?b ?q1 ?t ?q2)
     :precondition (and
       (Holding    ?b)
+        (Config ?q1)
       (Motion     ?q1 ?t ?q2)
       (CFreeTraj  ?t nil)
       (CFreeConf  ?q2)
     )
-    :effect (and)
+    :effect (and
+(not (Config ?q1))
+      (Config ?q2)
+)
   )
 
   (:action place
     :parameters (?b ?l ?q)
     :precondition (and
+        (Config ?q)
       (Holding    ?b)
       (not (= ?b nil))
       (Location   ?l)
