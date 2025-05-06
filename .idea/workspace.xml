@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="18c99ad4-32d1-488e-81c9-cecc4321ee8d" name="更改" comment="">
+      <change afterPath="$PROJECT_DIR$/.gitmodules" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/domain.pddl" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/evaluation_simple.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/pybullet_planning/motion/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/pybullet_planning/motion/motion_planners/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/pybullet_planning/motion/motion_planners/diverse.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/pybullet_planning/motion/motion_planners/graph.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/pybullet_planning/motion/motion_planners/lattice.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/pybullet_planning/motion/motion_planners/lazy_prm.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/pybullet_planning/motion/motion_planners/meta.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/pybullet_planning/motion/motion_planners/multi_rrt.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/pybullet_planning/motion/motion_planners/nearest.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/pybullet_planning/motion/motion_planners/primitives.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/pybullet_planning/motion/motion_planners/prm.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/pybullet_planning/motion/motion_planners/rrt.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/pybullet_planning/motion/motion_planners/rrt_connect.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/pybullet_planning/motion/motion_planners/rrt_star.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/pybullet_planning/motion/motion_planners/search.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/pybullet_planning/motion/motion_planners/smoothing.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/pybullet_planning/motion/motion_planners/star_roadmap.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/pybullet_planning/motion/motion_planners/utils.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/pybullet_planning/motion/tkinter/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/pybullet_planning/motion/tkinter/run.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/pybullet_planning/motion/tkinter/samplers.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/pybullet_planning/motion/tkinter/viewer.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/pybullet_planning/motion/trajectory/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/pybullet_planning/motion/trajectory/debug.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/pybullet_planning/motion/trajectory/discretize.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/pybullet_planning/motion/trajectory/limits.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/pybullet_planning/motion/trajectory/linear.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/pybullet_planning/motion/trajectory/parabolic.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/pybullet_planning/motion/trajectory/retime.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/pybullet_planning/motion/trajectory/smooth.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/run.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/run_mini.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/stream.pddl" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/stream.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/test.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/test_streams.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pddl.pdf" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/pddl/domain.pddl" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/pddl/problem.pddl" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/pddl/streams.pddl" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/planners/pddlstream_interface.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/requirements.txt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/run_planner.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/submission.py" beforeDir="false" afterPath="$PROJECT_DIR$/submission.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/test_build_problem.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/test_controller_script.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/test_controller_swap.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/test_extract_physical_world.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/test_infer_mapping.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/test_pddlstream_interface.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/test_submission_run.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/test_validate_and_execute.py" beforeDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="Python Script" />
+      </list>
+    </option>
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_BRANCH_BY_REPOSITORY">
+      <map>
+        <entry key="$PROJECT_DIR$" value="main" />
+      </map>
+    </option>
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="GitHubPullRequestSearchHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPEN&quot;,
+    &quot;assignee&quot;: &quot;jchen3031&quot;
+  }
+}</component>
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://github.com/dongdongbh/s25rmp.git&quot;,
+    &quot;accountId&quot;: &quot;7888c1cb-802d-4a15-8abd-63461f5748f6&quot;
+  }
+}</component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 2
+}</component>
+  <component name="ProjectId" id="2wgxr9b6SEJhvGmIk8Bc4Yy9hfL" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;Python.run.executor&quot;: &quot;Run&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;mini__chen&quot;,
+    &quot;last_opened_file_path&quot;: &quot;D:/GitHub/s25rmp/pybullet_planning/motion&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
+  }
+}</component>
+  <component name="RecentsManager">
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="D:\GitHub\s25rmp\pybullet_planning\motion" />
+      <recent name="D:\GitHub\s25rmp" />
+      <recent name="D:\GitHub\s25rmp\meshes\pybullet_planning" />
+      <recent name="D:\GitHub\s25rmp\pddl" />
+    </key>
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="D:\GitHub\s25rmp\pybullet_planning\motion\motion_planners" />
+    </key>
+  </component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-js-predefined-d6986cc7102b-822845ee3bb5-JavaScript-PY-243.23654.177" />
+        <option value="bundled-python-sdk-91d3a02ef49d-43b77aa2d136-com.jetbrains.pycharm.pro.sharedIndexes.bundled-PY-243.23654.177" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="应用程序级" UseSingleDictionary="true" transferred="true" />
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="默认任务">
+      <changelist id="18c99ad4-32d1-488e-81c9-cecc4321ee8d" name="更改" comment="" />
+      <created>1746477216025</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1746477216025</updated>
+      <workItem from="1746477216809" duration="18659000" />
+      <workItem from="1746511668028" duration="113000" />
+    </task>
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+  <component name="XDebuggerManager">
+    <breakpoint-manager>
+      <breakpoints>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/simulation.py</url>
+          <option name="timeStamp" value="1" />
+        </line-breakpoint>
+      </breakpoints>
+    </breakpoint-manager>
+  </component>
+  <component name="com.intellij.coverage.CoverageDataManagerImpl">
+    <SUITE FILE_PATH="coverage/s25rmp$run.coverage" NAME="run 覆盖结果" MODIFIED="1746509897557" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+  </component>
+</project>

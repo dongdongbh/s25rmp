@@ -1,9 +1,0 @@
-numpy
-scipy
-pybullet
-python-fcl
-trimesh
-pytest
-matplotlib
-# Optional:
-ompl-bindings
