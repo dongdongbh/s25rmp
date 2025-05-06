@@ -18,6 +18,26 @@ _movable_joints = None
 _ee_link = None
 _collision_fn = None
 
+def register_environment(env):
+    """
+    Call this from run.py once the SimulationEnvironment is up,
+    so that all of your sample_motion / inverse_kin generators
+    can see the same robot, joints, and collision checker.
+    """
+    global _env, _robot, _movable_joints, _ee_link, _collision_fn
+    _env            = env
+    _robot          = env.robot_id
+    _ee_link        = env.joint_index['t7m']
+    _movable_joints = get_movable_joints(_robot)
+    obstacles       = list(env.block_id.values())[1:]
+    _collision_fn   = get_collision_fn(_robot, _movable_joints,
+                                       obstacles=obstacles)
+
+    nj = pb.getNumJoints(_robot)
+    for link in range(nj):
+        # linkIndexA = -1 refers to the base, linkIndexB is the moving link
+        pb.setCollisionFilterPair(_robot, _robot, -1, link, enableCollision=0)
+
 
 def _extract_pair(x):
     """Recursively find a 2‑tuple (np.array, quat) inside nested lists/tuples."""
@@ -34,16 +54,13 @@ def _extract_pair(x):
 
 
 def init_pybullet(show=False):
-    global _env, _robot, _movable_joints, _ee_link, _collision_fn
+    global _env, _robot, _movable_joints, _ee_link
     if _env is not None:
         pb.disconnect()
     _env = SimulationEnvironment(show=show)
-    _robot = _env.robot_id
-    _ee_link = _env.joint_index['t7m']
+    _robot     = _env.robot_id
+    _ee_link   = _env.joint_index['t7m']
     _movable_joints = get_movable_joints(_robot)
-    obstacles = list(_env.block_id.values())[1:]
-    _collision_fn = get_collision_fn(_robot, _movable_joints,
-                                     obstacles=obstacles)
 
 # -----------------------------------------------------------------------------
 # CONTEXT‐MANAGER (optional, used in execute_plan)
