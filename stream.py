@@ -113,7 +113,8 @@ def _inverse_kin_fn(block, raw_pose, raw_grasp):
     # lift target above block
     CUBE_SIDE  = 0.01905
     target_pos = (pos[0], pos[1], pos[2] + CUBE_SIDE/2 + 0.05)
-
+    from simulation import _pb_to_quat, _quat_to_pb
+    ori = _quat_to_pb(ori)
     # seed with current joints
     q0 = [pb.getJointState(_robot, j)[0] for j in _movable_joints]
     sol = pb.calculateInverseKinematics(
